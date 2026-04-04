@@ -1,0 +1,8 @@
+
+# sst
+.sst
+node_modules/
+node_modules
+.env
+.env.prod
+
