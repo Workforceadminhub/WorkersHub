@@ -21,8 +21,11 @@ export function withAuth(handler: AuthHandler) {
     try {
       const auth = requireAuth(event);
       const { method, path } = getMethodAndPath(event);
-      const isAttendanceAdd = method === "POST" && (path === "/api/attendance/add" || path?.startsWith?.("/api/attendance/add"));
-      const isAuditFetch = method === "GET" && (path === "/api/audit" || path?.startsWith?.("/api/audit"));
+      const isAttendanceAdd =
+        method === "POST" &&
+        (path === "/api/hub/attendance/add" || path?.startsWith?.("/api/hub/attendance/add"));
+      const isAuditFetch =
+        method === "GET" && (path === "/api/hub/audit" || path?.startsWith?.("/api/hub/audit"));
       if (!isAttendanceAdd && !isAuditFetch) {
         const metadata = metadataFromEvent(event);
         if (auth.department != null) metadata.department = auth.department;

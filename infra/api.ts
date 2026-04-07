@@ -11,7 +11,7 @@ export const env = {
   REPORT_EMAILS: process.env.REPORT_EMAILS!,
 };
 
-api.route("POST /auth/signin", {
+api.route("POST /api/hub/auth/signin", {
   handler: "src/handlers/auth/login.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -28,7 +28,7 @@ api.route("POST /auth/signin", {
   ],
 });
 
-api.route("GET /api/audit", {
+api.route("GET /api/hub/audit", {
   handler: "src/handlers/audit/fetchAudit.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -45,7 +45,7 @@ api.route("GET /api/audit", {
   ],
 });
 
-api.route("GET /api/workers", {
+api.route("GET /api/hub/workers", {
   handler: "src/handlers/workers/fetchWorkers.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -62,7 +62,7 @@ api.route("GET /api/workers", {
   ],
 });
 
-api.route("GET /api/super/admin/workers", {
+api.route("GET /api/hub/super/admin/workers", {
   handler: "src/handlers/workers/admin/listWorkers.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -79,7 +79,7 @@ api.route("GET /api/super/admin/workers", {
   ],
 });
 
-api.route("POST /api/super/admin/workers", {
+api.route("POST /api/hub/super/admin/workers", {
   handler: "src/handlers/workers/admin/createWorker.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -95,7 +95,7 @@ api.route("POST /api/super/admin/workers", {
     },
   ],
 });
-api.route("POST /api/super/admin/attendance/export", {
+api.route("POST /api/hub/super/admin/attendance/export", {
   handler: "src/handlers/workers/admin/exportAttendance.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -112,7 +112,7 @@ api.route("POST /api/super/admin/attendance/export", {
   ],
 });
 
-api.route("PUT /api/super/admin/workers", {
+api.route("PUT /api/hub/super/admin/workers", {
   handler: "src/handlers/workers/admin/updateWorker.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -129,7 +129,7 @@ api.route("PUT /api/super/admin/workers", {
   ],
 });
 
-api.route("PUT /api/super/admin/{id}/workers/approve", {
+api.route("PUT /api/hub/super/admin/{id}/workers/approve", {
   handler: "src/handlers/workers/admin/approveWorker.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -145,7 +145,7 @@ api.route("PUT /api/super/admin/{id}/workers/approve", {
     },
   ],
 });
-api.route("PUT /api/super/admin/{id}/workers/approve-remove-worker", {
+api.route("PUT /api/hub/super/admin/{id}/workers/approve-remove-worker", {
   handler: "src/handlers/workers/admin/approveRemoveWorker.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -162,7 +162,7 @@ api.route("PUT /api/super/admin/{id}/workers/approve-remove-worker", {
   ],
 });
 
-api.route("DELETE /api/super/admin/{id}/workers", {
+api.route("DELETE /api/hub/super/admin/{id}/workers", {
   handler: "src/handlers/workers/admin/deleteWorker.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -179,7 +179,7 @@ api.route("DELETE /api/super/admin/{id}/workers", {
   ],
 });
 
-api.route("GET /api/super/admin/admins", {
+api.route("GET /api/hub/super/admin/admins", {
   handler: "src/handlers/admin/listAdmins.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -190,7 +190,7 @@ api.route("GET /api/super/admin/admins", {
   ],
 });
 
-api.route("POST /api/super/admin/admins", {
+api.route("POST /api/hub/super/admin/admins", {
   handler: "src/handlers/admin/createAdmin.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -201,7 +201,7 @@ api.route("POST /api/super/admin/admins", {
   ],
 });
 
-api.route("PUT /api/super/admin/{id}", {
+api.route("PUT /api/hub/super/admin/{id}", {
   handler: "src/handlers/admin/updateAdmin.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -212,7 +212,7 @@ api.route("PUT /api/super/admin/{id}", {
   ],
 });
 
-api.route("PUT /api/super/admin/{id}/role", {
+api.route("PUT /api/hub/super/admin/{id}/role", {
   handler: "src/handlers/admin/assignRole.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -223,7 +223,7 @@ api.route("PUT /api/super/admin/{id}/role", {
   ],
 });
 
-api.route("PUT /api/super/admin/{id}/permissions", {
+api.route("PUT /api/hub/super/admin/{id}/permissions", {
   handler: "src/handlers/admin/assignPermissions.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -234,7 +234,7 @@ api.route("PUT /api/super/admin/{id}/permissions", {
   ],
 });
 
-api.route("DELETE /api/super/admin/{id}", {
+api.route("DELETE /api/hub/super/admin/{id}", {
   handler: "src/handlers/admin/deleteAdmin.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -245,7 +245,7 @@ api.route("DELETE /api/super/admin/{id}", {
   ],
 });
 
-api.route("GET /api/super/admin/{id}/workers/details", {
+api.route("GET /api/hub/super/admin/{id}/workers/details", {
   handler: "src/handlers/workers/admin/getWorkerDetails.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -262,7 +262,7 @@ api.route("GET /api/super/admin/{id}/workers/details", {
   ],
 });
 
-api.route("GET /api/unmarked/workers", {
+api.route("GET /api/hub/unmarked/workers", {
   handler: "src/handlers/workers/fetchUnmarked.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -279,7 +279,7 @@ api.route("GET /api/unmarked/workers", {
   ],
 });
 
-api.route("POST /api/workers/add", {
+api.route("POST /api/hub/workers/add", {
   handler: "src/handlers/workers/addWorkers.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -296,7 +296,7 @@ api.route("POST /api/workers/add", {
   ],
 });
 
-api.route("PUT /api/workers/requestDelete", {
+api.route("PUT /api/hub/workers/requestDelete", {
   handler: "src/handlers/workers/removeWorker.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -313,7 +313,7 @@ api.route("PUT /api/workers/requestDelete", {
   ],
 });
 
-api.route("GET /api/attendance/admin", {
+api.route("GET /api/hub/attendance/admin", {
   handler: "src/handlers/workers/fetchAdminAttendance.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -330,7 +330,7 @@ api.route("GET /api/attendance/admin", {
   ],
 });
 
-api.route("GET /api/attendance", {
+api.route("GET /api/hub/attendance", {
   handler: "src/handlers/workers/fetchAttendance.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -347,7 +347,7 @@ api.route("GET /api/attendance", {
   ],
 });
 
-api.route("GET /api/attendance/history", {
+api.route("GET /api/hub/attendance/history", {
   handler: "src/handlers/workers/fetchAttendanceHistory.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -364,7 +364,7 @@ api.route("GET /api/attendance/history", {
   ],
 });
 
-api.route("GET /api/attendance/trends", {
+api.route("GET /api/hub/attendance/trends", {
   handler: "src/handlers/workers/fetchAttendanceTrends.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -382,7 +382,7 @@ api.route("GET /api/attendance/trends", {
 });
 
 // add attendance api
-api.route("POST /api/attendance/add", {
+api.route("POST /api/hub/attendance/add", {
   handler: "src/handlers/workers/addAttendance.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -399,7 +399,7 @@ api.route("POST /api/attendance/add", {
   ],
 });
 
-api.route("GET /api/uniquedates", {
+api.route("GET /api/hub/uniquedates", {
   handler: "src/handlers/workers/getUniqueDates.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -416,7 +416,7 @@ api.route("GET /api/uniquedates", {
   ],
 });
 
-api.route("PUT /api/attendance/close", {
+api.route("PUT /api/hub/attendance/close", {
   handler: "src/handlers/workers/closeAttendance.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -433,7 +433,7 @@ api.route("PUT /api/attendance/close", {
   ],
 });
 
-api.route("PUT /api/attendance/enable", {
+api.route("PUT /api/hub/attendance/enable", {
   handler: "src/handlers/workers/enable.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -449,7 +449,7 @@ api.route("PUT /api/attendance/enable", {
     },
   ],
 });
-api.route("PUT /api/attendance/disable", {
+api.route("PUT /api/hub/attendance/disable", {
   handler: "src/handlers/workers/disable.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -466,7 +466,7 @@ api.route("PUT /api/attendance/disable", {
   ],
 });
 
-api.route("DELETE /api/attendance/not-recorded", {
+api.route("DELETE /api/hub/attendance/not-recorded", {
   handler: "src/handlers/workers/deleteNotRecordedAttendance.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -483,7 +483,7 @@ api.route("DELETE /api/attendance/not-recorded", {
   ],
 });
 
-api.route("DELETE /api/attendance/record", {
+api.route("DELETE /api/hub/attendance/record", {
   handler: "src/handlers/workers/deleteAttendanceRecord.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -500,7 +500,7 @@ api.route("DELETE /api/attendance/record", {
   ],
 });
 
-api.route("POST /api/workers/generate/report", {
+api.route("POST /api/hub/workers/generate/report", {
   handler: "src/handlers/report/generateReport.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -518,7 +518,7 @@ api.route("POST /api/workers/generate/report", {
 });
 
 // Department endpoints
-api.route("GET /api/departments", {
+api.route("GET /api/hub/departments", {
   handler: "src/handlers/departments/listDepartments.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -535,7 +535,7 @@ api.route("GET /api/departments", {
   ],
 });
 
-api.route("POST /api/departments", {
+api.route("POST /api/hub/departments", {
   handler: "src/handlers/departments/addDepartment.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -552,7 +552,7 @@ api.route("POST /api/departments", {
   ],
 });
 
-api.route("PUT /api/departments/toggle-status", {
+api.route("PUT /api/hub/departments/toggle-status", {
   handler: "src/handlers/departments/toggleDepartmentStatus.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -569,7 +569,7 @@ api.route("PUT /api/departments/toggle-status", {
   ],
 });
 
-api.route("PUT /api/departments", {
+api.route("PUT /api/hub/departments", {
   handler: "src/handlers/departments/updateDepartment.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -586,7 +586,7 @@ api.route("PUT /api/departments", {
   ],
 });
 
-api.route("DELETE /api/departments/{id}/delete", {
+api.route("DELETE /api/hub/departments/{id}/delete", {
   handler: "src/handlers/departments/deleteDepartment.handler",
   environment: { ...env },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
@@ -609,7 +609,7 @@ const trainingPerms = [
   { actions: ["secretsmanager:*"], resources: ["*"] },
 ];
 
-api.route("POST /api/trainings", {
+api.route("POST /api/hub/trainings", {
   handler: "src/handlers/trainings/createTraining.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -617,7 +617,7 @@ api.route("POST /api/trainings", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings", {
+api.route("GET /api/hub/trainings", {
   handler: "src/handlers/trainings/listTrainings.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -625,7 +625,7 @@ api.route("GET /api/trainings", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}", {
+api.route("GET /api/hub/trainings/{id}", {
   handler: "src/handlers/trainings/getTrainingDetail.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -633,7 +633,7 @@ api.route("GET /api/trainings/{id}", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}/enrollees", {
+api.route("GET /api/hub/trainings/{id}/enrollees", {
   handler: "src/handlers/trainings/getTrainingEnrollees.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -641,7 +641,7 @@ api.route("GET /api/trainings/{id}/enrollees", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/register", {
+api.route("POST /api/hub/trainings/{id}/register", {
   handler: "src/handlers/trainings/registerForTraining.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -649,7 +649,7 @@ api.route("POST /api/trainings/{id}/register", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/nominate", {
+api.route("POST /api/hub/trainings/{id}/nominate", {
   handler: "src/handlers/trainings/nominateWorkers.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -657,7 +657,7 @@ api.route("POST /api/trainings/{id}/nominate", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/modules", {
+api.route("POST /api/hub/trainings/{id}/modules", {
   handler: "src/handlers/trainings/postTrainingModule.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -665,7 +665,7 @@ api.route("POST /api/trainings/{id}/modules", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/modules/{moduleId}/lessons", {
+api.route("POST /api/hub/trainings/{id}/modules/{moduleId}/lessons", {
   handler: "src/handlers/trainings/postTrainingLesson.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -673,7 +673,7 @@ api.route("POST /api/trainings/{id}/modules/{moduleId}/lessons", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}/curriculum", {
+api.route("GET /api/hub/trainings/{id}/curriculum", {
   handler: "src/handlers/trainings/getTrainingCurriculum.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -681,7 +681,7 @@ api.route("GET /api/trainings/{id}/curriculum", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}/worker-curriculum", {
+api.route("GET /api/hub/trainings/{id}/worker-curriculum", {
   handler: "src/handlers/trainings/getWorkerTrainingCurriculum.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -689,7 +689,7 @@ api.route("GET /api/trainings/{id}/worker-curriculum", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/participation", {
+api.route("POST /api/hub/trainings/{id}/participation", {
   handler: "src/handlers/trainings/postTrainingParticipation.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -697,7 +697,7 @@ api.route("POST /api/trainings/{id}/participation", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/department-assignments", {
+api.route("POST /api/hub/trainings/{id}/department-assignments", {
   handler: "src/handlers/trainings/postDepartmentAssignment.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -705,7 +705,7 @@ api.route("POST /api/trainings/{id}/department-assignments", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}/department-assignments", {
+api.route("GET /api/hub/trainings/{id}/department-assignments", {
   handler: "src/handlers/trainings/listDepartmentAssignments.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -713,7 +713,7 @@ api.route("GET /api/trainings/{id}/department-assignments", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/users/{id}/trainings", {
+api.route("GET /api/hub/users/{id}/trainings", {
   handler: "src/handlers/trainings/getUserTrainings.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -721,7 +721,7 @@ api.route("GET /api/users/{id}/trainings", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/users/{id}/training-metrics", {
+api.route("GET /api/hub/users/{id}/training-metrics", {
   handler: "src/handlers/trainings/getUserTrainingMetrics.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -729,7 +729,7 @@ api.route("GET /api/users/{id}/training-metrics", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/enrollments/{enrollmentId}/complete", {
+api.route("POST /api/hub/trainings/{id}/enrollments/{enrollmentId}/complete", {
   handler: "src/handlers/trainings/completeEnrollment.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -737,7 +737,7 @@ api.route("POST /api/trainings/{id}/enrollments/{enrollmentId}/complete", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}/certificates", {
+api.route("GET /api/hub/trainings/{id}/certificates", {
   handler: "src/handlers/trainings/listTrainingCertificates.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -745,7 +745,7 @@ api.route("GET /api/trainings/{id}/certificates", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/stream-sessions", {
+api.route("POST /api/hub/trainings/{id}/stream-sessions", {
   handler: "src/handlers/trainings/postStreamSession.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -753,7 +753,7 @@ api.route("POST /api/trainings/{id}/stream-sessions", {
   permissions: [...trainingPerms],
 });
 
-api.route("PATCH /api/trainings/{id}/stream-sessions/{streamSessionId}", {
+api.route("PATCH /api/hub/trainings/{id}/stream-sessions/{streamSessionId}", {
   handler: "src/handlers/trainings/patchStreamSession.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -761,7 +761,7 @@ api.route("PATCH /api/trainings/{id}/stream-sessions/{streamSessionId}", {
   permissions: [...trainingPerms],
 });
 
-api.route("POST /api/trainings/{id}/recordings", {
+api.route("POST /api/hub/trainings/{id}/recordings", {
   handler: "src/handlers/trainings/postRecording.handler",
   environment: { ...env },
   link: [...trainingLink],
@@ -769,7 +769,7 @@ api.route("POST /api/trainings/{id}/recordings", {
   permissions: [...trainingPerms],
 });
 
-api.route("GET /api/trainings/{id}/recordings", {
+api.route("GET /api/hub/trainings/{id}/recordings", {
   handler: "src/handlers/trainings/listRecordings.handler",
   environment: { ...env },
   link: [...trainingLink],

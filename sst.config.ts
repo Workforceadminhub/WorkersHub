@@ -3,7 +3,7 @@
 export default $config({
   app(input) {
     return {
-      name: "harvesters-hub",
+      name: "harvestershub",
       removal: input?.stage === "production" || input?.stage === "harvesters" ? "retain" : "remove",
       protect: ["production", "harvesters"].includes(input?.stage),
       home: "aws",
@@ -13,13 +13,13 @@ export default $config({
           profile: input?.stage === "harvesters" ? "harvesters" : "default",
           defaultTags: {
             tags: {
-              project: "harvesters-hub",
+              project: "harvestershub",
               stage: input?.stage || "dev",
-              app: "harvesters-hub",
-              team: "harvesters-hub",
-              owner: "harvesters-hub",
+              app: "harvestershub",
+              team: "harvestershub",
+              owner: "harvestershub",
               environment: input?.stage || "dev",
-              costCenter: "harvesters-hub",
+              costCenter: "harvestershub",
             },
           },
         },

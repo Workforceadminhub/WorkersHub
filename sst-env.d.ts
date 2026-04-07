@@ -5,6 +5,10 @@
 
 declare module "sst" {
   export interface Resource {
+    "ActivateDB": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "BREVO_API_KEY": {
       "type": "sst.sst.Secret"
       "value": string
@@ -21,9 +25,17 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "HarvestersApi": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
     "JWT_SECRET": {
       "type": "sst.sst.Secret"
       "value": string
+    }
+    "ReportGeneration": {
+      "name": string
+      "type": "sst.aws.Function"
     }
   }
 }

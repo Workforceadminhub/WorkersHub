@@ -278,46 +278,46 @@ export function eventFromRoute(method: string, path: string): string {
   const normalizedPath = (path || "").replace(/\/$/, "") || "/";
   const upper = (method || "GET").toUpperCase();
 
-  if (normalizedPath === "/auth/signin" && upper === "POST") return "login";
-  if (normalizedPath.startsWith("/api/attendance/add") && upper === "POST")
+  if (normalizedPath === "/api/hub/auth/signin" && upper === "POST") return "login";
+  if (normalizedPath.startsWith("/api/hub/attendance/add") && upper === "POST")
     return "attendance_marked";
-  if (normalizedPath.startsWith("/api/attendance/admin") && upper === "GET")
+  if (normalizedPath.startsWith("/api/hub/attendance/admin") && upper === "GET")
     return "admin_attendance_fetched";
-  if (normalizedPath.startsWith("/api/attendance") && upper === "GET") return "attendance_fetched";
-  if (normalizedPath.startsWith("/api/super/admin/workers") && upper === "GET")
+  if (normalizedPath.startsWith("/api/hub/attendance") && upper === "GET") return "attendance_fetched";
+  if (normalizedPath.startsWith("/api/hub/super/admin/workers") && upper === "GET")
     return "workers_listed_admin";
-  if (normalizedPath.startsWith("/api/super/admin/workers") && upper === "POST")
+  if (normalizedPath.startsWith("/api/hub/super/admin/workers") && upper === "POST")
     return "worker_created";
-  if (normalizedPath.startsWith("/api/super/admin/workers") && upper === "PUT")
+  if (normalizedPath.startsWith("/api/hub/super/admin/workers") && upper === "PUT")
     return "worker_updated";
   if (normalizedPath.includes("/approve") && upper === "PUT" && !normalizedPath.includes("remove"))
     return "worker_approved";
   if (normalizedPath.includes("/approve-remove-worker") && upper === "PUT")
     return "worker_remove_approved";
-  if (normalizedPath.startsWith("/api/super/admin/") && upper === "DELETE") return "worker_deleted";
-  if (normalizedPath.startsWith("/api/super/admin/attendance/export") && upper === "POST")
+  if (normalizedPath.startsWith("/api/hub/super/admin/") && upper === "DELETE") return "worker_deleted";
+  if (normalizedPath.startsWith("/api/hub/super/admin/attendance/export") && upper === "POST")
     return "attendance_exported";
-  if (normalizedPath.startsWith("/api/unmarked/workers") && upper === "GET")
+  if (normalizedPath.startsWith("/api/hub/unmarked/workers") && upper === "GET")
     return "unmarked_workers_fetched";
-  if (normalizedPath.startsWith("/api/workers") && upper === "GET") return "workers_fetched";
-  if (normalizedPath.startsWith("/api/workers/add") && upper === "POST") return "workers_added";
-  if (normalizedPath.startsWith("/api/workers/requestDelete") && upper === "PUT")
+  if (normalizedPath.startsWith("/api/hub/workers") && upper === "GET") return "workers_fetched";
+  if (normalizedPath.startsWith("/api/hub/workers/add") && upper === "POST") return "workers_added";
+  if (normalizedPath.startsWith("/api/hub/workers/requestDelete") && upper === "PUT")
     return "worker_remove_requested";
-  if (normalizedPath.startsWith("/api/uniquedates") && upper === "GET")
+  if (normalizedPath.startsWith("/api/hub/uniquedates") && upper === "GET")
     return "unique_dates_fetched";
-  if (normalizedPath.startsWith("/api/attendance/close") && upper === "PUT")
+  if (normalizedPath.startsWith("/api/hub/attendance/close") && upper === "PUT")
     return "attendance_closed";
-  if (normalizedPath.startsWith("/api/attendance/enable") && upper === "PUT")
+  if (normalizedPath.startsWith("/api/hub/attendance/enable") && upper === "PUT")
     return "attendance_enabled";
-  if (normalizedPath.startsWith("/api/attendance/disable") && upper === "PUT")
+  if (normalizedPath.startsWith("/api/hub/attendance/disable") && upper === "PUT")
     return "attendance_disabled";
-  if (normalizedPath.startsWith("/api/workers/generate/report") && upper === "POST")
+  if (normalizedPath.startsWith("/api/hub/workers/generate/report") && upper === "POST")
     return "report_generated";
-  if (normalizedPath.startsWith("/api/departments") && upper === "GET") return "departments_listed";
-  if (normalizedPath.startsWith("/api/departments") && upper === "POST") return "department_added";
-  if (normalizedPath.startsWith("/api/departments/toggle-status") && upper === "PUT")
+  if (normalizedPath.startsWith("/api/hub/departments") && upper === "GET") return "departments_listed";
+  if (normalizedPath.startsWith("/api/hub/departments") && upper === "POST") return "department_added";
+  if (normalizedPath.startsWith("/api/hub/departments/toggle-status") && upper === "PUT")
     return "department_status_toggled";
-  if (normalizedPath.startsWith("/api/departments") && upper === "PUT") return "department_updated";
+  if (normalizedPath.startsWith("/api/hub/departments") && upper === "PUT") return "department_updated";
   if (
     normalizedPath.includes("/departments/") &&
     normalizedPath.endsWith("/delete") &&
@@ -325,14 +325,14 @@ export function eventFromRoute(method: string, path: string): string {
   )
     return "department_deleted";
   if (
-    normalizedPath.startsWith("/api/super/admin/") &&
+    normalizedPath.startsWith("/api/hub/super/admin/") &&
     normalizedPath.endsWith("/workers/details") &&
     upper === "GET"
   )
     return "worker_details_fetched";
 
-  if (normalizedPath.startsWith("/api/trainings") && upper === "POST") return "training_created";
-  if (normalizedPath.startsWith("/api/trainings") && upper === "GET") return "trainings_fetched";
+  if (normalizedPath.startsWith("/api/hub/trainings") && upper === "POST") return "training_created";
+  if (normalizedPath.startsWith("/api/hub/trainings") && upper === "GET") return "trainings_fetched";
   if (normalizedPath.includes("/trainings/") && normalizedPath.includes("/register") && upper === "POST")
     return "training_registered";
   if (normalizedPath.includes("/trainings/") && normalizedPath.includes("/nominate") && upper === "POST")
