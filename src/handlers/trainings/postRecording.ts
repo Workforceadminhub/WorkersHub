@@ -2,15 +2,15 @@ import { withAuth } from "../../middleware";
 import TrainingService from "../../services/training.server";
 import { response } from "../../utils";
 import { canManageTrainingOperations } from "../../utils/trainingPermissions";
-import { idempotencyKeyFromEvent } from "./_utils";
+import { coerceId, idempotencyKeyFromEvent, pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   if (!canManageTrainingOperations(auth)) {
     return { statusCode: 403, body: JSON.stringify({ success: false, message: "Forbidden" }) };
   }
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    if (!Number.isFinite(trainingId)) return response(400, "Invalid training id");
+    const trainingId = pathParamId(event, "id");
+    if (!trainingId) return response(400, "Invalid training id");
 
     void idempotencyKeyFromEvent(event);
 
@@ -22,7 +22,7 @@ export const handler = withAuth(async (event, auth) => {
     const svc = TrainingService();
     const row = await svc.addRecording({
       training_id: trainingId,
-      stream_session_id: body.stream_session_id ?? null,
+      stream_session_id: body.stream_session_id != null ? coerceId(body.stream_session_id) || null : null,
       title: body.title,
       storage_url: body.storage_url,
       duration_seconds: body.duration_seconds ?? null,

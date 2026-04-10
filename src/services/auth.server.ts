@@ -1,12 +1,13 @@
 import { db } from "../database/db.server";
 import { signAccessToken } from "../utils";
 import { ROLES, ROLES_VALUES } from "../utils/enums";
+import { verifyPassword } from "../utils/passwordHash";
 
 const getRole = (user: {
-  id: number;
+  id: string;
   code: string | null;
   userinfo: string | null;
-  workerid: number | null;
+  workerid: string | null;
   createdat: Date | null;
   updatedat: Date | null;
   route: string | null;
@@ -35,21 +36,39 @@ function getPermissions(user: { permissions?: unknown; department?: string | nul
 }
 
 const AuthService = () => {
-  const login = async ({ password }: { password: string }) => {
+  /**
+   * Email + password sign-in. Email is stored normalized (lowercase) on `admin.email`.
+   * Inactive accounts (e.g. pending self-registration) receive a clear error.
+   */
+  const login = async ({ email, password }: { email: string; password: string }) => {
+    const emailNorm = email.trim().toLowerCase();
+    if (!emailNorm || !password) {
+      throw new Error("Invalid email or password.");
+    }
+
     const user = await db
       .selectFrom("admin as users")
       .selectAll()
-      .where("users.code", "=", password)
+      .where("users.email", "=", emailNorm)
       .executeTakeFirst();
-    console.log("User found:", user);
 
-    if (!user) throw new Error("Invalid email or password.");
+    if (!user || !user.password_hash || !verifyPassword(password, user.password_hash)) {
+      throw new Error("Invalid email or password.");
+    }
+
+    if (!user.isactive) {
+      throw new Error("Account is pending approval. Contact an administrator.");
+    }
+
+    if (user.email_verified_at == null) {
+      throw new Error("Please verify your email before signing in.");
+    }
 
     const permissions = getPermissions(user);
 
     const accessToken = signAccessToken({
       userId: user.id,
-      email: user.code,
+      email: user.email ?? emailNorm,
       route: user.route,
       department: user.department,
       team: user.team,
@@ -67,3 +86,4 @@ const AuthService = () => {
 };
 
 export default AuthService;
+

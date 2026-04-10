@@ -578,7 +578,7 @@ const AttendanceService = () => {
   // -------------------------------
   // DELETE SINGLE ATTENDANCE RECORD
   // -------------------------------
-  const deleteAttendanceRecord = async (workerid: number, attendancedate: string) => {
+  const deleteAttendanceRecord = async (workerid: string, attendancedate: string) => {
     try {
       const existing = await db
         .selectFrom(table)

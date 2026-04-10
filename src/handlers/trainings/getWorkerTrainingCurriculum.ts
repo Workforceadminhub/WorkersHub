@@ -2,12 +2,12 @@ import { withAuth } from "../../middleware";
 import TrainingService, { resolveWorkerIdFromAdminUser } from "../../services/training.server";
 import { response } from "../../utils";
 import { ROLES } from "../../utils/enums";
-import { adminUserIdFromAuth } from "./_utils";
+import { adminUserIdFromAuth, pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    if (!Number.isFinite(trainingId)) return response(400, "Invalid training id");
+    const trainingId = pathParamId(event, "id");
+    if (!trainingId) return response(400, "Invalid training id");
 
     const adminId = adminUserIdFromAuth(auth.userId);
     const linkedWorkerId = await resolveWorkerIdFromAdminUser(adminId);

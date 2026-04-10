@@ -1,6 +1,6 @@
 import { sql } from "kysely";
-import { ulid } from "ulid";
 import { db } from "../database/db.server";
+import { getUniqueId } from "../utils";
 
 const CATEGORIES = ["leadership", "orientation", "skills"] as const;
 const MODES = ["physical", "virtual"] as const;
@@ -30,7 +30,7 @@ function trainingLifecycle(start: string | Date, end: string | Date): "upcoming"
   return "ongoing";
 }
 
-export async function resolveWorkerIdFromAdminUser(adminUserId: number): Promise<number | null> {
+export async function resolveWorkerIdFromAdminUser(adminUserId: string): Promise<string | null> {
   const row = await db
     .selectFrom("admin")
     .select("workerid")
@@ -40,7 +40,7 @@ export async function resolveWorkerIdFromAdminUser(adminUserId: number): Promise
 }
 
 async function workerCompletedTemplateBefore(
-  workerId: number,
+  workerId: string,
   templateSlug: string,
 ): Promise<boolean> {
   const row = await db
@@ -70,7 +70,7 @@ export type CreateTrainingInput = {
 };
 
 const TrainingService = () => {
-  const createTraining = async (input: CreateTrainingInput, createdByAdminId: number) => {
+  const createTraining = async (input: CreateTrainingInput, createdByAdminId: string) => {
     if (!CATEGORIES.includes(input.category)) {
       throw new Error(`Invalid category; expected one of: ${CATEGORIES.join(", ")}`);
     }
@@ -80,9 +80,11 @@ const TrainingService = () => {
     const desc = input.description?.slice(0, 1500) ?? null;
     const templateSlug = (input.template_slug?.trim() || slugify(input.name)).slice(0, 255);
     const now = new Date();
+    const id = getUniqueId();
     const row = await db
       .insertInto("training")
       .values({
+        id,
         name: input.name.slice(0, 500),
         description: desc,
         cohort: input.cohort?.slice(0, 255) ?? null,
@@ -106,11 +108,10 @@ const TrainingService = () => {
       process.env.TRAINING_REGISTRATION_BASE_URL ||
       process.env.FRONTEND_URL ||
       "https://hub.example.com";
-    const registration_link = `${base.replace(/\/$/, "")}/trainings/register/${row.public_id}`;
+    const registration_link = `${base.replace(/\/$/, "")}/trainings/register/${row.id}`;
 
     return {
       training_id: row.id,
-      public_id: row.public_id,
       registration_link,
     };
   };
@@ -196,14 +197,13 @@ const TrainingService = () => {
       .groupBy("training_id")
       .execute();
 
-    const countMap = new Map<number, number>();
+    const countMap = new Map<string, number>();
     for (const r of enrolleeCounts) {
       countMap.set(r.training_id, Number(r.cnt));
     }
 
     const data = slice.map((tr) => ({
       id: tr.id,
-      public_id: tr.public_id,
       name: tr.name,
       start_date: tr.start_date,
       end_date: tr.end_date,
@@ -239,21 +239,12 @@ const TrainingService = () => {
     };
   };
 
-  const getTrainingById = async (trainingId: number) => {
+  const getTrainingById = async (trainingId: string) => {
     const tr = await db.selectFrom("training").selectAll().where("id", "=", trainingId).executeTakeFirst();
     return tr ?? null;
   };
 
-  const getTrainingByPublicId = async (publicId: string) => {
-    const tr = await db
-      .selectFrom("training")
-      .selectAll()
-      .where("public_id", "=", publicId)
-      .executeTakeFirst();
-    return tr ?? null;
-  };
-
-  const getEnrollees = async (trainingId: number, page: number, perPage: number) => {
+  const getEnrollees = async (trainingId: string, page: number, perPage: number) => {
     const p = Math.max(1, page);
     const pp = Math.min(100, Math.max(1, perPage));
     const offset = (p - 1) * pp;
@@ -299,7 +290,7 @@ const TrainingService = () => {
       .where("training_id", "=", trainingId)
       .execute();
 
-    const byWorker = new Map<number, { present: number; total: number }>();
+    const byWorker = new Map<string, { present: number; total: number }>();
     for (const wid of enrollments.map((e) => e.worker_id)) {
       const present = participation.filter(
         (p) => p.worker_id === wid && p.status === "present",
@@ -341,8 +332,8 @@ const TrainingService = () => {
   };
 
   const enrollWorker = async (opts: {
-    trainingId: number;
-    workerId: number;
+    trainingId: string;
+    workerId: string;
     nominationSource: "self" | "admin" | "leader";
     idempotencyKey?: string | null;
   }) => {
@@ -400,6 +391,7 @@ const TrainingService = () => {
     const row = await db
       .insertInto("training_enrollment")
       .values({
+        id: getUniqueId(),
         training_id: opts.trainingId,
         worker_id: opts.workerId,
         enrollment_type: enrollmentType,
@@ -417,8 +409,8 @@ const TrainingService = () => {
   };
 
   const nominateWorkers = async (opts: {
-    trainingId: number;
-    workerIds: number[];
+    trainingId: string;
+    workerIds: string[];
     nominationSource: "admin" | "leader";
     idempotencyKey?: string | null;
   }) => {
@@ -475,7 +467,7 @@ const TrainingService = () => {
     return { results, replayed: false as const };
   };
 
-  const addModule = async (trainingId: number, title: string, sortOrder?: number) => {
+  const addModule = async (trainingId: string, title: string, sortOrder?: number) => {
     const maxRow = await db
       .selectFrom("training_module")
       .select(db.fn.max("sort_order").as("m"))
@@ -485,6 +477,7 @@ const TrainingService = () => {
     return db
       .insertInto("training_module")
       .values({
+        id: getUniqueId(),
         training_id: trainingId,
         title: title.slice(0, 500),
         sort_order: next,
@@ -493,7 +486,7 @@ const TrainingService = () => {
       .executeTakeFirstOrThrow();
   };
 
-  const assertModuleBelongsToTraining = async (moduleId: number, trainingId: number) => {
+  const assertModuleBelongsToTraining = async (moduleId: string, trainingId: string) => {
     const row = await db
       .selectFrom("training_module")
       .select("training_id")
@@ -502,7 +495,7 @@ const TrainingService = () => {
     if (!row || row.training_id !== trainingId) throw new Error("Module not found for this training");
   };
 
-  const addLesson = async (moduleId: number, title: string, content: string | null, sortOrder?: number) => {
+  const addLesson = async (moduleId: string, title: string, content: string | null, sortOrder?: number) => {
     const maxRow = await db
       .selectFrom("training_lesson")
       .select(db.fn.max("sort_order").as("m"))
@@ -512,6 +505,7 @@ const TrainingService = () => {
     return db
       .insertInto("training_lesson")
       .values({
+        id: getUniqueId(),
         module_id: moduleId,
         title: title.slice(0, 500),
         content,
@@ -521,7 +515,7 @@ const TrainingService = () => {
       .executeTakeFirstOrThrow();
   };
 
-  const getCurriculum = async (trainingId: number) => {
+  const getCurriculum = async (trainingId: string) => {
     const modules = await db
       .selectFrom("training_module")
       .selectAll()
@@ -542,7 +536,7 @@ const TrainingService = () => {
             .orderBy("sort_order", "asc")
             .execute();
 
-    const byModule = new Map<number, typeof lessons>();
+    const byModule = new Map<string, typeof lessons>();
     for (const l of lessons) {
       const list = byModule.get(l.module_id) ?? [];
       list.push(l);
@@ -563,8 +557,8 @@ const TrainingService = () => {
   };
 
   const recordParticipation = async (opts: {
-    trainingId: number;
-    workerId: number;
+    trainingId: string;
+    workerId: string;
     session_date: string;
     status: "present" | "absent";
   }) => {
@@ -588,6 +582,7 @@ const TrainingService = () => {
     const row = await db
       .insertInto("training_participation")
       .values({
+        id: getUniqueId(),
         training_id: opts.trainingId,
         worker_id: opts.workerId,
         session_date: opts.session_date,
@@ -599,9 +594,9 @@ const TrainingService = () => {
   };
 
   const addDepartmentAssignment = async (input: {
-    worker_id: number;
-    department_id: number;
-    training_id: number | null;
+    worker_id: string;
+    department_id: string;
+    training_id: string | null;
     start_date: string;
     required_duration_days: number;
   }) => {
@@ -615,6 +610,7 @@ const TrainingService = () => {
     return db
       .insertInto("training_department_assignment")
       .values({
+        id: getUniqueId(),
         worker_id: input.worker_id,
         department_id: input.department_id,
         training_id: input.training_id,
@@ -625,7 +621,7 @@ const TrainingService = () => {
       .executeTakeFirstOrThrow();
   };
 
-  const listDepartmentAssignments = async (trainingId: number) => {
+  const listDepartmentAssignments = async (trainingId: string) => {
     const rows = await db
       .selectFrom("training_department_assignment as a")
       .innerJoin("worker as w", "w.id", "a.worker_id")
@@ -676,7 +672,7 @@ const TrainingService = () => {
     });
   };
 
-  const getWorkerTrainings = async (workerId: number) => {
+  const getWorkerTrainings = async (workerId: string) => {
     const rows = await db
       .selectFrom("training_enrollment as e")
       .innerJoin("training as t", "t.id", "e.training_id")
@@ -709,7 +705,7 @@ const TrainingService = () => {
     }));
   };
 
-  const getWorkerTrainingMetrics = async (workerId: number) => {
+  const getWorkerTrainingMetrics = async (workerId: string) => {
     const list = await getWorkerTrainings(workerId);
     let ongoing = 0;
     let upcoming = 0;
@@ -738,7 +734,7 @@ const TrainingService = () => {
     };
   };
 
-  const completeEnrollment = async (trainingId: number, enrollmentId: number) => {
+  const completeEnrollment = async (trainingId: string, enrollmentId: string) => {
     const en = await db
       .selectFrom("training_enrollment")
       .selectAll()
@@ -765,10 +761,11 @@ const TrainingService = () => {
       return { enrollment_id: enrollmentId, certificate: existingCert, certificate_created: false };
     }
 
-    const certificate_number = `CERT-${ulid()}`;
+    const certificate_number = `CERT-${getUniqueId()}`;
     const cert = await db
       .insertInto("training_certificate")
       .values({
+        id: getUniqueId(),
         training_id: trainingId,
         worker_id: en.worker_id,
         certificate_number,
@@ -779,7 +776,7 @@ const TrainingService = () => {
     return { enrollment_id: enrollmentId, certificate: cert, certificate_created: true };
   };
 
-  const listCertificatesForTraining = async (trainingId: number) => {
+  const listCertificatesForTraining = async (trainingId: string) => {
     return db
       .selectFrom("training_certificate as c")
       .innerJoin("worker as w", "w.id", "c.worker_id")
@@ -799,7 +796,7 @@ const TrainingService = () => {
   };
 
   const createStreamSession = async (input: {
-    training_id: number;
+    training_id: string;
     provider: string;
     provider_room_id?: string | null;
     stream_url?: string | null;
@@ -812,6 +809,7 @@ const TrainingService = () => {
     return db
       .insertInto("training_stream_session")
       .values({
+        id: getUniqueId(),
         training_id: input.training_id,
         provider: input.provider.slice(0, 64),
         provider_room_id: input.provider_room_id ?? null,
@@ -827,8 +825,8 @@ const TrainingService = () => {
   };
 
   const updateStreamSession = async (
-    streamSessionId: number,
-    trainingId: number,
+    streamSessionId: string,
+    trainingId: string,
     patch: Partial<{
       stream_url: string | null;
       started_at: string | null;
@@ -860,8 +858,8 @@ const TrainingService = () => {
   };
 
   const addRecording = async (input: {
-    training_id: number;
-    stream_session_id?: number | null;
+    training_id: string;
+    stream_session_id?: string | null;
     title: string;
     storage_url: string;
     duration_seconds?: number | null;
@@ -871,6 +869,7 @@ const TrainingService = () => {
     return db
       .insertInto("training_recording")
       .values({
+        id: getUniqueId(),
         training_id: input.training_id,
         stream_session_id: input.stream_session_id ?? null,
         title: input.title.slice(0, 500),
@@ -883,13 +882,13 @@ const TrainingService = () => {
       .executeTakeFirstOrThrow();
   };
 
-  const listRecordings = async (trainingId: number, libraryOnly: boolean) => {
+  const listRecordings = async (trainingId: string, libraryOnly: boolean) => {
     let q = db.selectFrom("training_recording").selectAll().where("training_id", "=", trainingId);
     if (libraryOnly) q = q.where("library_visible", "=", true);
     return q.orderBy("createdat", "desc").execute();
   };
 
-  const isEnrolled = async (trainingId: number, workerId: number) => {
+  const isEnrolled = async (trainingId: string, workerId: string) => {
     const row = await db
       .selectFrom("training_enrollment")
       .select("id")
@@ -899,7 +898,7 @@ const TrainingService = () => {
     return row != null;
   };
 
-  const getAdminTrainingDetail = async (trainingId: number) => {
+  const getAdminTrainingDetail = async (trainingId: string) => {
     const tr = await getTrainingById(trainingId);
     if (!tr) return null;
     const curriculum = await getCurriculum(trainingId);
@@ -941,7 +940,6 @@ const TrainingService = () => {
     listTrainings,
     getDashboardMetrics,
     getTrainingById,
-    getTrainingByPublicId,
     getEnrollees,
     enrollWorker,
     nominateWorkers,

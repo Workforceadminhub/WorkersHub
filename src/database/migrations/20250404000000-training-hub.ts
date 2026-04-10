@@ -1,11 +1,12 @@
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 
+/** All training PKs/FKs use varchar(26) ULIDs (server-generated via getUlid / getUniqueId). */
+
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("training")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("public_id", "uuid", (col) => col.notNull().defaultTo(sql`gen_random_uuid()`).unique())
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
     .addColumn("name", "varchar(500)", (col) => col.notNull())
     .addColumn("description", "varchar(1500)")
     .addColumn("cohort", "varchar(255)")
@@ -18,7 +19,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addColumn("capacity", "integer")
     .addColumn("registration_deadline", "timestamptz")
     .addColumn("template_slug", "varchar(255)", (col) => col.notNull())
-    .addColumn("created_by_admin_id", "integer")
+    .addColumn("created_by_admin_id", "varchar(26)")
     .addColumn("createdat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
     .addColumn("updatedat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
     .execute();
@@ -41,8 +42,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_module")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("training_id", "integer", (col) => col.notNull().references("training.id").onDelete("cascade"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
     .addColumn("title", "varchar(500)", (col) => col.notNull())
     .addColumn("sort_order", "integer", (col) => col.notNull().defaultTo(0))
     .addColumn("createdat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
@@ -50,8 +51,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_lesson")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("module_id", "integer", (col) => col.notNull().references("training_module.id").onDelete("cascade"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("module_id", "varchar(26)", (col) => col.notNull().references("training_module.id").onDelete("cascade"))
     .addColumn("title", "varchar(500)", (col) => col.notNull())
     .addColumn("content", "text")
     .addColumn("sort_order", "integer", (col) => col.notNull().defaultTo(0))
@@ -60,9 +61,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_enrollment")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("training_id", "integer", (col) => col.notNull().references("training.id").onDelete("cascade"))
-    .addColumn("worker_id", "integer", (col) => col.notNull().references("worker.id").onDelete("cascade"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
+    .addColumn("worker_id", "varchar(26)", (col) => col.notNull().references("worker.id").onDelete("cascade"))
     .addColumn("enrollment_type", "varchar(20)", (col) => col.notNull())
     .addColumn("nomination_source", "varchar(20)", (col) => col.notNull())
     .addColumn("enrolled_at", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
@@ -89,9 +90,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_participation")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("training_id", "integer", (col) => col.notNull().references("training.id").onDelete("cascade"))
-    .addColumn("worker_id", "integer", (col) => col.notNull().references("worker.id").onDelete("cascade"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
+    .addColumn("worker_id", "varchar(26)", (col) => col.notNull().references("worker.id").onDelete("cascade"))
     .addColumn("session_date", "date", (col) => col.notNull())
     .addColumn("status", "varchar(20)", (col) => col.notNull())
     .addColumn("createdat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
@@ -109,10 +110,10 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_department_assignment")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("worker_id", "integer", (col) => col.notNull().references("worker.id").onDelete("cascade"))
-    .addColumn("department_id", "integer", (col) => col.notNull().references("admin.id").onDelete("restrict"))
-    .addColumn("training_id", "integer", (col) => col.references("training.id").onDelete("set null"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("worker_id", "varchar(26)", (col) => col.notNull().references("worker.id").onDelete("cascade"))
+    .addColumn("department_id", "varchar(26)", (col) => col.notNull().references("admin.id").onDelete("restrict"))
+    .addColumn("training_id", "varchar(26)", (col) => col.references("training.id").onDelete("set null"))
     .addColumn("start_date", "date", (col) => col.notNull())
     .addColumn("required_duration_days", "integer", (col) => col.notNull())
     .addColumn("createdat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
@@ -120,9 +121,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_certificate")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("training_id", "integer", (col) => col.notNull().references("training.id").onDelete("cascade"))
-    .addColumn("worker_id", "integer", (col) => col.notNull().references("worker.id").onDelete("cascade"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
+    .addColumn("worker_id", "varchar(26)", (col) => col.notNull().references("worker.id").onDelete("cascade"))
     .addColumn("certificate_number", "varchar(64)", (col) => col.notNull().unique())
     .addColumn("issued_at", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
     .execute();
@@ -133,8 +134,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_stream_session")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("training_id", "integer", (col) => col.notNull().references("training.id").onDelete("cascade"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
     .addColumn("provider", "varchar(64)", (col) => col.notNull())
     .addColumn("provider_room_id", "varchar(255)")
     .addColumn("stream_url", "text")
@@ -150,9 +151,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
   await db.schema
     .createTable("training_recording")
-    .addColumn("id", "serial", (col) => col.primaryKey())
-    .addColumn("training_id", "integer", (col) => col.notNull().references("training.id").onDelete("cascade"))
-    .addColumn("stream_session_id", "integer", (col) => col.references("training_stream_session.id").onDelete("set null"))
+    .addColumn("id", "varchar(26)", (col) => col.primaryKey())
+    .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
+    .addColumn("stream_session_id", "varchar(26)", (col) => col.references("training_stream_session.id").onDelete("set null"))
     .addColumn("title", "varchar(500)", (col) => col.notNull())
     .addColumn("storage_url", "text", (col) => col.notNull())
     .addColumn("duration_seconds", "integer")

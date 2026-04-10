@@ -1,9 +1,16 @@
+import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
 import { db } from "../database/db.server";
+import { getUniqueId } from "../utils";
+import { ROLES } from "../utils/enums";
+import { hashPassword } from "../utils/passwordHash";
+import { sendPasswordResetEmail, sendVerificationEmail } from "./authEmail.server";
 
 export type CreateAdminInput = {
   code: string;
   email?: string | null;
+  /** Plain text; stored as bcrypt in password_hash. Required when isactive is true (default). */
+  initialPassword?: string | null;
   department?: string | null;
   team?: string | null;
   route?: string | null;
@@ -12,59 +19,161 @@ export type CreateAdminInput = {
   role?: string | null;
   permission_level?: string[] | null;
   userinfo?: string | null;
-  workerid?: number | null;
+  workerid?: string | null;
 };
 
+export type RegisterPublicUserInput = {
+  email: string;
+  password: string;
+  firstname?: string | null;
+  lastname?: string | null;
+};
+
+function normalizeEmail(email: string | null | undefined): string | null {
+  if (email == null || typeof email !== "string") return null;
+  const t = email.trim().toLowerCase();
+  return t.length ? t : null;
+}
+
+function assertPasswordPolicy(plain: string): void {
+  if (typeof plain !== "string" || plain.length < 8) {
+    throw new Error("Password must be at least 8 characters");
+  }
+}
+
+function randomOpaqueToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+function hoursFromNow(hours: number): Date {
+  return new Date(Date.now() + hours * 3600 * 1000);
+}
+
 /**
- * Creates a new admin user. Use max(id)+1 for id. Permissions stored as JSONB.
- * Throws if code already exists.
+ * Self-service registration: creates an inactive admin row (role worker) until a super admin activates it.
  */
-export async function createAdmin(
-  input: CreateAdminInput,
-  assignedByUserId?: number | string
-): Promise<{ id: number; code: string; permissions: string[]; role: string | null; permission_level: string[] }> {
-  const existing = await db.selectFrom("admin").select(["id"]).where("code", "=", input.code).executeTakeFirst();
-  if (existing) throw new Error("An admin with this code already exists");
+export async function registerPublicUser(
+  input: RegisterPublicUserInput,
+): Promise<{ id: string; email: string }> {
+  const email = normalizeEmail(input.email);
+  if (!email) throw new Error("A valid email is required");
+  assertPasswordPolicy(input.password);
 
-  const lastRow = await db
-    .selectFrom("admin")
-    .select(["id"])
-    .orderBy("id", "desc")
-    .limit(1)
-    .executeTakeFirst();
-  const newId = (lastRow?.id ?? 0) + 1;
+  const dup = await db.selectFrom("admin").select("id").where("email", "=", email).executeTakeFirst();
+  if (dup) throw new Error("An account with this email already exists");
 
-  const permissions = input.permissions ?? [];
-  const permissionsJson = JSON.stringify(permissions);
-  const permissionLevel = input.permission_level ?? [];
-  const permissionLevelJson = JSON.stringify(permissionLevel);
+  const newId = getUniqueId();
+  const code = getUniqueId();
   const now = new Date();
-  const assignedBy =
-    assignedByUserId != null
-      ? typeof assignedByUserId === "string"
-        ? parseInt(assignedByUserId, 10)
-        : assignedByUserId
+  const verifyToken = randomOpaqueToken();
+  const verifyExpires = hoursFromNow(48);
+  const userinfo =
+    input.firstname?.trim() || input.lastname?.trim()
+      ? JSON.stringify({
+          firstname: input.firstname?.trim() || null,
+          lastname: input.lastname?.trim() || null,
+        })
       : null;
 
   await db
     .insertInto("admin")
     .values({
       id: newId,
+      code,
+      email,
+      password_hash: hashPassword(input.password),
+      userinfo,
+      workerid: null,
+      createdat: now,
+      updatedat: now,
+      route: null,
+      department: null,
+      team: null,
+      isactive: false,
+      permissions: sql`CAST('[]' AS JSONB)`,
+      assigned_by: null,
+      assigned_date: null,
+      role: ROLES.WORKER,
+      permission_level: sql`CAST('[]' AS JSONB)`,
+      email_verified_at: null,
+      email_verification_token: verifyToken,
+      email_verification_expires: verifyExpires,
+      reset_password_token: null,
+      reset_password_expires: null,
+    })
+    .execute();
+
+  try {
+    await sendVerificationEmail(email, verifyToken);
+  } catch (e) {
+    console.error("[auth] Failed to send verification email:", e);
+    throw new Error("Account created but verification email could not be sent. Contact support.");
+  }
+
+  return { id: newId, email };
+}
+
+/**
+ * Creates a new admin user. Id is a server-generated ULID. Permissions stored as JSONB.
+ * Throws if code already exists.
+ */
+export async function createAdmin(
+  input: CreateAdminInput,
+  assignedByUserId?: string | null
+): Promise<{ id: string; code: string; permissions: string[]; role: string | null; permission_level: string[] }> {
+  const existing = await db.selectFrom("admin").select(["id"]).where("code", "=", input.code).executeTakeFirst();
+  if (existing) throw new Error("An admin with this code already exists");
+
+  const emailNorm = normalizeEmail(input.email ?? null);
+  if (emailNorm) {
+    const dupEmail = await db.selectFrom("admin").select("id").where("email", "=", emailNorm).executeTakeFirst();
+    if (dupEmail) throw new Error("An admin with this email already exists");
+  }
+
+  const isactive = input.isactive !== undefined ? input.isactive : true;
+  if (isactive) {
+    if (!emailNorm) throw new Error("Email is required for active accounts");
+    assertPasswordPolicy(input.initialPassword?.trim() ?? "");
+  }
+
+  const newId = getUniqueId();
+
+  const permissions = input.permissions ?? [];
+  const permissionsJson = JSON.stringify(permissions);
+  const permissionLevel = input.permission_level ?? [];
+  const permissionLevelJson = JSON.stringify(permissionLevel);
+  const now = new Date();
+  const assignedBy = assignedByUserId?.trim() ? assignedByUserId.trim() : null;
+
+  const passwordPlain = input.initialPassword?.trim();
+  const password_hash = passwordPlain ? hashPassword(passwordPlain) : null;
+  const emailVerifiedAt = isactive ? now : null;
+
+  await db
+    .insertInto("admin")
+    .values({
+      id: newId,
       code: input.code,
-      email: input.email ?? null,
+      email: emailNorm,
+      password_hash,
       userinfo: input.userinfo ?? null,
-      workerid: input.workerid ?? null,
+      workerid: input.workerid?.trim() ? input.workerid.trim() : null,
       createdat: now,
       updatedat: now,
       route: input.route ?? null,
       department: input.department ?? null,
       team: input.team ?? null,
-      isactive: input.isactive !== undefined ? input.isactive : true,
+      isactive,
       permissions: sql`CAST(${permissionsJson} AS JSONB)`,
-      assigned_by: Number.isNaN(assignedBy as number) ? null : assignedBy,
+      assigned_by: assignedBy,
       assigned_date: assignedBy != null ? now : null,
       role: input.role ?? null,
       permission_level: sql`CAST(${permissionLevelJson} AS JSONB)`,
+      email_verified_at: emailVerifiedAt,
+      email_verification_token: null,
+      email_verification_expires: null,
+      reset_password_token: null,
+      reset_password_expires: null,
     })
     .execute();
 
@@ -81,10 +190,10 @@ export async function createAdmin(
  * Assigns role and/or permission_level (array) to an admin user. Omitted fields are left unchanged.
  */
 export async function assignRole(
-  adminId: number,
+  adminId: string,
   role?: string | null,
   permissionLevel?: string[] | null
-): Promise<{ id: number; role: string | null; permission_level: string[] } | null> {
+): Promise<{ id: string; role: string | null; permission_level: string[] } | null> {
   const set: Record<string, unknown> = {};
   if (role !== undefined) set.role = role ?? null;
   if (permissionLevel !== undefined) {
@@ -118,12 +227,11 @@ export async function assignRole(
  * Sets assigned_by and assigned_date to record who assigned and when.
  */
 export async function assignPermissions(
-  adminId: number,
+  adminId: string,
   permissions: string[],
-  assignedByUserId: number | string
-): Promise<{ id: number; permissions: string[]; assigned_by: number | null; assigned_date: string | null } | null> {
-  const assignedBy =
-    typeof assignedByUserId === "string" ? parseInt(assignedByUserId, 10) : assignedByUserId;
+  assignedByUserId: string
+): Promise<{ id: string; permissions: string[]; assigned_by: string | null; assigned_date: string | null } | null> {
+  const assignedBy = assignedByUserId.trim() || null;
   const permissionsJson = JSON.stringify(permissions ?? []);
   const now = new Date();
 
@@ -131,7 +239,7 @@ export async function assignPermissions(
     .updateTable("admin")
     .set({
       permissions: sql`CAST(${permissionsJson} AS JSONB)`,
-      assigned_by: Number.isNaN(assignedBy) ? null : assignedBy,
+      assigned_by: assignedBy,
       assigned_date: now,
     })
     .where("id", "=", adminId)
@@ -162,7 +270,7 @@ export type UpdateAdminFields = {
   route?: string | null;
   isactive?: boolean | null;
   userinfo?: string | null;
-  workerid?: number | null;
+  workerid?: string | null;
 };
 
 /**
@@ -170,10 +278,10 @@ export type UpdateAdminFields = {
  * Returns the updated admin row (selected fields) or null if not found.
  */
 export async function updateAdmin(
-  adminId: number,
+  adminId: string,
   fields: UpdateAdminFields
 ): Promise<{
-  id: number;
+  id: string;
   code: string | null;
   email: string | null;
   department: string | null;
@@ -181,7 +289,7 @@ export async function updateAdmin(
   route: string | null;
   isactive: boolean | null;
   userinfo: string | null;
-  workerid: number | null;
+  workerid: string | null;
 } | null> {
   const allowedKeys: (keyof UpdateAdminFields)[] = [
     "email",
@@ -196,7 +304,11 @@ export async function updateAdmin(
   const set: Record<string, unknown> = { updatedat: new Date() };
   for (const key of allowedKeys) {
     if (key in fields && fields[key] !== undefined) {
-      set[key] = fields[key];
+      if (key === "email") {
+        set[key] = normalizeEmail(fields.email as string | null | undefined);
+      } else {
+        set[key] = fields[key];
+      }
     }
   }
   if (Object.keys(set).length <= 1) {
@@ -219,9 +331,190 @@ export async function updateAdmin(
 }
 
 /**
+ * One-time bootstrap: creates the first Super Admin when none exists.
+ * Optional env `AUTH_BOOTSTRAP_SECRET`: when set, request must send the same value in `X-Bootstrap-Secret`.
+ */
+export async function bootstrapSuperAdmin(input: {
+  email: string;
+  password: string;
+  code?: string | null;
+  bootstrapSecret?: string | null;
+}): Promise<{ id: string; email: string }> {
+  const requiredSecret = process.env.AUTH_BOOTSTRAP_SECRET?.trim();
+  if (requiredSecret && input.bootstrapSecret?.trim() !== requiredSecret) {
+    throw new Error("Invalid bootstrap secret");
+  }
+
+  const countRow = await db
+    .selectFrom("admin")
+    .select((eb) => eb.fn.count("id").as("c"))
+    .where("role", "=", ROLES.SUPER_ADMIN)
+    .executeTakeFirst();
+  const superCount = Number((countRow as { c?: string | number } | undefined)?.c ?? 0);
+  if (superCount > 0) {
+    throw new Error("A super admin already exists. Bootstrap is disabled.");
+  }
+
+  const emailNorm = normalizeEmail(input.email);
+  if (!emailNorm) throw new Error("A valid email is required");
+  assertPasswordPolicy(input.password);
+
+  const dup = await db.selectFrom("admin").select("id").where("email", "=", emailNorm).executeTakeFirst();
+  if (dup) throw new Error("An account with this email already exists");
+
+  const code = input.code?.trim() || getUniqueId();
+  const dupCode = await db.selectFrom("admin").select("id").where("code", "=", code).executeTakeFirst();
+  if (dupCode) throw new Error("This code is already in use");
+
+  const now = new Date();
+  const newId = getUniqueId();
+
+  await db
+    .insertInto("admin")
+    .values({
+      id: newId,
+      code,
+      email: emailNorm,
+      password_hash: hashPassword(input.password),
+      userinfo: null,
+      workerid: null,
+      createdat: now,
+      updatedat: now,
+      route: "/super-admin",
+      department: null,
+      team: null,
+      isactive: true,
+      permissions: sql`CAST('[]' AS JSONB)`,
+      assigned_by: null,
+      assigned_date: null,
+      role: ROLES.SUPER_ADMIN,
+      permission_level: sql`CAST('[]' AS JSONB)`,
+      email_verified_at: now,
+      email_verification_token: null,
+      email_verification_expires: null,
+      reset_password_token: null,
+      reset_password_expires: null,
+    })
+    .execute();
+
+  return { id: newId, email: emailNorm };
+}
+
+/** Always resolves; does not reveal whether the email exists. */
+export async function requestPasswordReset(emailRaw: string): Promise<void> {
+  const email = normalizeEmail(emailRaw);
+  if (!email) return;
+
+  const user = await db.selectFrom("admin").select(["id", "email"]).where("email", "=", email).executeTakeFirst();
+  if (!user?.email) return;
+
+  const token = randomOpaqueToken();
+  const expires = hoursFromNow(1);
+  await db
+    .updateTable("admin")
+    .set({
+      reset_password_token: token,
+      reset_password_expires: expires,
+      updatedat: new Date(),
+    })
+    .where("id", "=", user.id)
+    .execute();
+
+  try {
+    await sendPasswordResetEmail(user.email, token);
+  } catch (e) {
+    console.error("[auth] Password reset email failed:", e);
+  }
+}
+
+export async function resetPasswordWithToken(tokenRaw: string, newPassword: string): Promise<void> {
+  const token = tokenRaw?.trim();
+  if (!token) throw new Error("Token is required");
+  assertPasswordPolicy(newPassword);
+
+  const now = new Date();
+  const user = await db
+    .selectFrom("admin")
+    .select(["id"])
+    .where("reset_password_token", "=", token)
+    .where("reset_password_expires", ">", now)
+    .executeTakeFirst();
+
+  if (!user) throw new Error("Invalid or expired reset token");
+
+  await db
+    .updateTable("admin")
+    .set({
+      password_hash: hashPassword(newPassword),
+      reset_password_token: null,
+      reset_password_expires: null,
+      updatedat: now,
+    })
+    .where("id", "=", user.id)
+    .execute();
+}
+
+export async function verifyEmailWithToken(tokenRaw: string): Promise<void> {
+  const token = tokenRaw?.trim();
+  if (!token) throw new Error("Token is required");
+
+  const now = new Date();
+  const user = await db
+    .selectFrom("admin")
+    .select(["id"])
+    .where("email_verification_token", "=", token)
+    .where("email_verification_expires", ">", now)
+    .executeTakeFirst();
+
+  if (!user) throw new Error("Invalid or expired verification token");
+
+  await db
+    .updateTable("admin")
+    .set({
+      email_verified_at: now,
+      email_verification_token: null,
+      email_verification_expires: null,
+      updatedat: now,
+    })
+    .where("id", "=", user.id)
+    .execute();
+}
+
+/** Resend verification email if the account exists and is still unverified. */
+export async function resendEmailVerification(emailRaw: string): Promise<void> {
+  const email = normalizeEmail(emailRaw);
+  if (!email) return;
+
+  const user = await db
+    .selectFrom("admin")
+    .select(["id", "email", "email_verified_at"])
+    .where("email", "=", email)
+    .executeTakeFirst();
+  if (!user?.email || user.email_verified_at != null) return;
+
+  const token = randomOpaqueToken();
+  const expires = hoursFromNow(48);
+  await db
+    .updateTable("admin")
+    .set({
+      email_verification_token: token,
+      email_verification_expires: expires,
+      updatedat: new Date(),
+    })
+    .where("id", "=", user.id)
+    .execute();
+
+  try {
+    await sendVerificationEmail(user.email, token);
+  } catch (e) {
+    console.error("[auth] Resend verification email failed:", e);
+  }
+}
+
+/**
  * Deletes an admin by id. Returns the deleted id if found, null otherwise.
  */
-export async function deleteAdmin(adminId: number): Promise<{ id: number } | null> {
+export async function deleteAdmin(adminId: string): Promise<{ id: string } | null> {
   const deleted = await db
     .deleteFrom("admin")
     .where("id", "=", adminId)

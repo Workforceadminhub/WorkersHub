@@ -2,22 +2,22 @@ import { withAuth } from "../../middleware";
 import TrainingService from "../../services/training.server";
 import { response } from "../../utils";
 import { canManageTrainingOperations } from "../../utils/trainingPermissions";
-import { idempotencyKeyFromEvent } from "./_utils";
+import { coerceId, idempotencyKeyFromEvent, pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   if (!canManageTrainingOperations(auth)) {
     return { statusCode: 403, body: JSON.stringify({ success: false, message: "Forbidden" }) };
   }
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    if (!Number.isFinite(trainingId)) return response(400, "Invalid training id");
+    const trainingId = pathParamId(event, "id");
+    if (!trainingId) return response(400, "Invalid training id");
 
     const body = JSON.parse(event.body || "{}");
-    const workerId = parseInt(String(body.user_id ?? body.worker_id ?? ""), 10);
+    const workerId = coerceId(body.user_id ?? body.worker_id ?? "");
     const session_date = String(body.date ?? body.session_date ?? "").slice(0, 10);
     const status = body.status === "absent" ? "absent" : "present";
 
-    if (!Number.isFinite(workerId) || !session_date) {
+    if (!workerId || !session_date) {
       return response(400, "user_id (or worker_id) and date required");
     }
 

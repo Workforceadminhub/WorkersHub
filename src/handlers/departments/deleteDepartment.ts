@@ -10,10 +10,8 @@ export const handler = withRole(ROLES_ADMIN_AND_ABOVE, async (event, auth) => {
       return response(400, "Department id is required");
     }
 
-    const departmentId = parseInt(id);
-    if (isNaN(departmentId)) {
-      return response(400, "Department id must be a valid number");
-    }
+    const departmentId = id.trim();
+    if (!departmentId) return response(400, "Department id is required");
 
     const service = DepartmentService();
     const result = await service.deleteDepartment(departmentId);

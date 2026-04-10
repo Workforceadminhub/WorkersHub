@@ -1,5 +1,6 @@
 import { sql } from "kysely";
 import { db } from "../database/db.server";
+import { getUniqueId } from "../utils";
 
 /** RDS Data API cannot serialize raw objects to JSONB; we must pass a JSON string and CAST in SQL. */
 function sanitizeForJson(value: unknown): unknown {
@@ -39,8 +40,8 @@ export type AuditPagination = {
 
 export type ListAuditResult = {
   data: Array<{
-    id: number;
-    user_id: number | null;
+    id: string;
+    user_id: string | null;
     user_code: string | null;
     event: string;
     createdat: string | Date | null;
@@ -56,7 +57,7 @@ export type ListAuditResult = {
  * Payload for the audit log. We log everything that happens so you can track how the app and services are used.
  */
 export type AuditPayload = {
-  userId?: number | string | null;
+  userId?: string | null;
   userCode?: string | null;
   event: string;
   metadata?: Record<string, unknown> | null;
@@ -246,12 +247,7 @@ export async function listAuditLogs(
  */
 export async function logAudit(payload: AuditPayload): Promise<void> {
   try {
-    const userId =
-      payload.userId != null
-        ? typeof payload.userId === "string"
-          ? parseInt(payload.userId, 10)
-          : payload.userId
-        : null;
+    const userId = payload.userId?.trim() ? payload.userId.trim() : null;
 
     const metadataJson =
       payload.metadata != null ? JSON.stringify(sanitizeForJson(payload.metadata)) : null;
@@ -259,7 +255,8 @@ export async function logAudit(payload: AuditPayload): Promise<void> {
     await db
       .insertInto("audit_log")
       .values({
-        user_id: Number.isNaN(userId) ? null : userId,
+        id: getUniqueId(),
+        user_id: userId,
         user_code: payload.userCode ?? null,
         event: payload.event,
         metadata: metadataJson === null ? null : sql`CAST(${metadataJson} AS JSONB)`,
@@ -279,6 +276,15 @@ export function eventFromRoute(method: string, path: string): string {
   const upper = (method || "GET").toUpperCase();
 
   if (normalizedPath === "/api/hub/auth/signin" && upper === "POST") return "login";
+  if (normalizedPath === "/api/hub/auth/register" && upper === "POST") return "user_registered";
+  if (normalizedPath === "/api/hub/auth/bootstrap-super-admin" && upper === "POST")
+    return "super_admin_bootstrapped";
+  if (normalizedPath === "/api/hub/auth/forgot-password" && upper === "POST") return "password_reset_requested";
+  if (normalizedPath === "/api/hub/auth/reset-password" && upper === "POST") return "password_reset_completed";
+  if (normalizedPath === "/api/hub/auth/verify-email" && (upper === "GET" || upper === "POST"))
+    return "email_verified";
+  if (normalizedPath === "/api/hub/auth/resend-verification" && upper === "POST")
+    return "verification_email_resent";
   if (normalizedPath.startsWith("/api/hub/attendance/add") && upper === "POST")
     return "attendance_marked";
   if (normalizedPath.startsWith("/api/hub/attendance/admin") && upper === "GET")

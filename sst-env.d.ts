@@ -29,6 +29,20 @@ declare module "sst" {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }
+    "HarvestersHubDatabase": {
+      "clusterArn": string
+      "database": string
+      "host": string
+      "password": string
+      "port": number
+      "reader": string
+      "secretArn": string
+      "type": "sst.aws.Aurora"
+      "username": string
+    }
+    "HarvestersHubVpc": {
+      "type": "sst.aws.Vpc"
+    }
     "JWT_SECRET": {
       "type": "sst.sst.Secret"
       "value": string

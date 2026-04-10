@@ -1,0 +1,1192 @@
+openapi: 3.0.3
+info:
+  title: Harvesters Hub API
+  description: |
+    HTTP API for Harvesters Hub. All routes except sign-in require `Authorization: Bearer <accessToken>`.
+    Set collection variable `baseUrl` to your API Gateway URL (no trailing slash).
+    Optional: `Idempotency-Key` header on retry-safe POSTs (training register, nominate, participation, etc.).
+  version: 1.0.0
+
+servers:
+  - url: "{{baseUrl}}"
+    description: API Gateway base URL
+
+tags:
+  - name: Auth
+  - name: Audit
+  - name: Workers
+  - name: Super Admin
+  - name: Attendance
+  - name: Departments
+  - name: Trainings
+  - name: Users
+  - name: Reports
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Optional idempotency token for safe POST retries
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          description: Min 8 characters
+          minLength: 8
+        firstname: { type: string }
+        lastname: { type: string }
+    CreateAdminRequest:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string }
+        email:
+          type: string
+          format: email
+          description: Required when isactive is true (default)
+        password:
+          type: string
+          minLength: 8
+          description: Required when isactive is true; stored as bcrypt hash
+        department: { type: string }
+        team: { type: string }
+        route: { type: string }
+        isactive: { type: boolean }
+        permissions:
+          type: array
+          items: { type: string }
+        role: { type: string }
+        permission_level:
+          type: array
+          items: { type: string }
+        userinfo: { type: string }
+        workerid: { type: string }
+    CreateTrainingRequest:
+      type: object
+      required: [name, start_date, end_date, category, mode]
+      properties:
+        name: { type: string }
+        description: { type: string, maxLength: 1500 }
+        cohort: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        category:
+          type: string
+          enum: [leadership, orientation, skills]
+        facilitator: { type: string }
+        mode:
+          type: string
+          enum: [physical, virtual]
+        duration: { type: string }
+        capacity: { type: integer }
+        registration_deadline: { type: string, format: date-time }
+        template_slug: { type: string }
+    TrainingModuleRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        sort_order: { type: integer }
+    TrainingLessonRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        content: { type: string }
+        sort_order: { type: integer }
+    NominateWorkersRequest:
+      type: object
+      required: [worker_ids]
+      properties:
+        worker_ids:
+          type: array
+          items: { type: string, description: Worker primary key (ULID) }
+    RegisterTrainingRequest:
+      type: object
+      properties:
+        worker_id:
+          type: string
+          description: When caller can nominate; omitted for self-registration via linked worker
+    ParticipationRequest:
+      type: object
+      required: [date]
+      properties:
+        user_id: { type: string }
+        worker_id: { type: string }
+        date: { type: string, format: date }
+        session_date: { type: string, format: date }
+        status:
+          type: string
+          enum: [present, absent]
+    DepartmentAssignmentRequest:
+      type: object
+      required: [worker_id, department_id, start_date, required_duration_days]
+      properties:
+        worker_id: { type: string }
+        user_id: { type: string }
+        department_id: { type: string }
+        start_date: { type: string, format: date }
+        required_duration_days: { type: integer, minimum: 1 }
+    StreamSessionRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider: { type: string, example: daily }
+        provider_room_id: { type: string }
+        stream_url: { type: string }
+        screen_share_enabled: { type: boolean }
+        chat_enabled: { type: boolean }
+        qna_enabled: { type: boolean }
+        recording_auto: { type: boolean }
+        participant_list_visible: { type: boolean }
+    RecordingRequest:
+      type: object
+      required: [title, storage_url]
+      properties:
+        title: { type: string }
+        storage_url: { type: string }
+        stream_session_id: { type: string }
+        duration_seconds: { type: integer }
+        downloadable: { type: boolean }
+        library_visible: { type: boolean }
+    PatchStreamSessionRequest:
+      type: object
+      properties:
+        stream_url: { type: string }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+        provider_room_id: { type: string }
+    BootstrapSuperAdminRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        code:
+          type: string
+          description: Optional unique admin code; server generates one if omitted
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+    VerifyEmailBody:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+    ResendVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/hub/auth/signin:
+    post:
+      tags: [Auth]
+      summary: Sign in (email and password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: accessToken and user payload
+        "400":
+          description: Invalid credentials
+        "403":
+          description: Account pending approval, or email not verified
+
+  /api/hub/auth/register:
+    post:
+      tags: [Auth]
+      summary: Self-service registration (pending approval)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created; inactive until an administrator activates it
+        "400":
+          description: Validation error
+        "409":
+          description: Email already registered
+        "503":
+          description: Verification email could not be sent
+
+  /api/hub/auth/bootstrap-super-admin:
+    post:
+      tags: [Auth]
+      summary: Bootstrap first Super Admin (only when none exists)
+      description: |
+        Optional header `X-Bootstrap-Secret` when env `AUTH_BOOTSTRAP_SECRET` is set.
+        After the first super admin exists, returns 409.
+      security: []
+      parameters:
+        - name: X-Bootstrap-Secret
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BootstrapSuperAdminRequest"
+      responses:
+        "201":
+          description: Super admin created
+        "400":
+          description: Validation error
+        "401":
+          description: Invalid bootstrap secret
+        "409":
+          description: Super admin already exists or email/code conflict
+
+  /api/hub/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Generic success (does not confirm email exists)
+
+  /api/hub/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Set new password using reset token from email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password updated
+        "400":
+          description: Invalid token or weak password
+
+  /api/hub/auth/verify-email:
+    get:
+      tags: [Auth]
+      summary: Verify email (link from registration email)
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Email verified
+        "400":
+          description: Invalid or expired token
+    post:
+      tags: [Auth]
+      summary: Verify email (JSON body)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailBody"
+      responses:
+        "200":
+          description: Email verified
+        "400":
+          description: Invalid or expired token
+
+  /api/hub/auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Resend email verification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendVerificationRequest"
+      responses:
+        "200":
+          description: Generic success
+
+  /api/hub/audit:
+    get:
+      tags: [Audit]
+      summary: List audit logs
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: department
+          in: query
+          schema: { type: string }
+        - name: permissions
+          in: query
+          schema: { type: string }
+          description: JSON array or comma-separated department list
+        - name: team
+          in: query
+          schema: { type: string }
+        - name: attendancedate
+          in: query
+          schema: { type: string }
+        - name: fromDate
+          in: query
+          schema: { type: string }
+        - name: toDate
+          in: query
+          schema: { type: string }
+        - name: event
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated audit rows
+
+  /api/hub/workers:
+    get:
+      tags: [Workers]
+      summary: List workers
+      responses:
+        "200":
+          description: Workers list
+
+  /api/hub/super/admin/workers:
+    get:
+      tags: [Super Admin]
+      summary: List workers (admin)
+      responses:
+        "200":
+          description: Workers list
+    post:
+      tags: [Super Admin]
+      summary: Create worker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Created
+    put:
+      tags: [Super Admin]
+      summary: Update worker
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Updated
+
+  /api/hub/super/admin/attendance/export:
+    post:
+      tags: [Super Admin]
+      summary: Export attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Export triggered or file info
+
+  /api/hub/super/admin/{id}/workers/approve:
+    put:
+      tags: [Super Admin]
+      summary: Approve worker
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/super/admin/{id}/workers/approve-remove-worker:
+    put:
+      tags: [Super Admin]
+      summary: Approve worker removal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/super/admin/{id}/workers:
+    delete:
+      tags: [Super Admin]
+      summary: Delete worker
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/super/admin/admins:
+    get:
+      tags: [Super Admin]
+      summary: List admins
+      responses:
+        "200":
+          description: Admins list
+    post:
+      tags: [Super Admin]
+      summary: Create admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminRequest"
+      responses:
+        "201":
+          description: Created
+
+  /api/hub/super/admin/{id}:
+    put:
+      tags: [Super Admin]
+      summary: Update admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [Super Admin]
+      summary: Delete admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/super/admin/{id}/role:
+    put:
+      tags: [Super Admin]
+      summary: Assign admin role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/super/admin/{id}/permissions:
+    put:
+      tags: [Super Admin]
+      summary: Assign admin permissions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/super/admin/{id}/workers/details:
+    get:
+      tags: [Super Admin]
+      summary: Get worker details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Worker details
+
+  /api/hub/unmarked/workers:
+    get:
+      tags: [Workers]
+      summary: Unmarked workers
+      responses:
+        "200":
+          description: List
+
+  /api/hub/workers/add:
+    post:
+      tags: [Workers]
+      summary: Add workers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/workers/requestDelete:
+    put:
+      tags: [Workers]
+      summary: Request worker delete
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/admin:
+    get:
+      tags: [Attendance]
+      summary: Admin attendance view
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance:
+    get:
+      tags: [Attendance]
+      summary: Attendance list
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/history:
+    get:
+      tags: [Attendance]
+      summary: Attendance history
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/trends:
+    get:
+      tags: [Attendance]
+      summary: Attendance trends
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/add:
+    post:
+      tags: [Attendance]
+      summary: Add attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/uniquedates:
+    get:
+      tags: [Attendance]
+      summary: Unique attendance dates
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/close:
+    put:
+      tags: [Attendance]
+      summary: Close attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/enable:
+    put:
+      tags: [Attendance]
+      summary: Enable attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/disable:
+    put:
+      tags: [Attendance]
+      summary: Disable attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/not-recorded:
+    delete:
+      tags: [Attendance]
+      summary: Delete not-recorded attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/attendance/record:
+    delete:
+      tags: [Attendance]
+      summary: Delete attendance record
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/workers/generate/report:
+    post:
+      tags: [Reports]
+      summary: Generate workers report
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/departments:
+    get:
+      tags: [Departments]
+      summary: List departments
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [Departments]
+      summary: Add department
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+    put:
+      tags: [Departments]
+      summary: Update department
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/departments/toggle-status:
+    put:
+      tags: [Departments]
+      summary: Toggle department status
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/departments/{id}/delete:
+    delete:
+      tags: [Departments]
+      summary: Delete department
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+
+  /api/hub/trainings:
+    get:
+      tags: [Trainings]
+      summary: Training dashboard (list + metrics)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [upcoming, ongoing, completed]
+      responses:
+        "200":
+          description: List and metrics
+    post:
+      tags: [Trainings]
+      summary: Create training (Super Admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTrainingRequest"
+      responses:
+        "201":
+          description: training_id, registration_link (registration URL uses training id)
+
+  /api/hub/trainings/{id}:
+    get:
+      tags: [Trainings]
+      summary: Training detail (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Full detail
+
+  /api/hub/trainings/{id}/enrollees:
+    get:
+      tags: [Trainings]
+      summary: List enrollees
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer }
+        - name: per_page
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Paginated enrollees
+
+  /api/hub/trainings/{id}/register:
+    post:
+      tags: [Trainings]
+      summary: Register for training (self or nominate via worker_id)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterTrainingRequest"
+      responses:
+        "200":
+          description: Already enrolled
+        "201":
+          description: Registered
+
+  /api/hub/trainings/{id}/nominate:
+    post:
+      tags: [Trainings]
+      summary: Nominate workers (bulk)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NominateWorkersRequest"
+      responses:
+        "200":
+          description: Per-worker results
+
+  /api/hub/trainings/{id}/modules:
+    post:
+      tags: [Trainings]
+      summary: Add curriculum module
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingModuleRequest"
+      responses:
+        "201":
+          description: Module created
+
+  /api/hub/trainings/{id}/modules/{moduleId}/lessons:
+    post:
+      tags: [Trainings]
+      summary: Add lesson to module
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: moduleId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrainingLessonRequest"
+      responses:
+        "201":
+          description: Lesson created
+
+  /api/hub/trainings/{id}/curriculum:
+    get:
+      tags: [Trainings]
+      summary: Get curriculum (admin/dashboard)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Modules and lessons
+
+  /api/hub/trainings/{id}/worker-curriculum:
+    get:
+      tags: [Trainings]
+      summary: Worker curriculum (enrolled only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Modules and lessons
+
+  /api/hub/trainings/{id}/participation:
+    post:
+      tags: [Trainings]
+      summary: Record session participation
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParticipationRequest"
+      responses:
+        "200":
+          description: Recorded or updated
+
+  /api/hub/trainings/{id}/department-assignments:
+    get:
+      tags: [Trainings]
+      summary: List post-training department assignments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Assignments with progress
+    post:
+      tags: [Trainings]
+      summary: Create department assignment
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepartmentAssignmentRequest"
+      responses:
+        "201":
+          description: Created
+
+  /api/hub/users/{id}/trainings:
+    get:
+      tags: [Users]
+      summary: Trainings for a worker (user id = worker id)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Trainings list
+
+  /api/hub/users/{id}/training-metrics:
+    get:
+      tags: [Users]
+      summary: Training metrics for a worker
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Metrics object
+
+  /api/hub/trainings/{id}/enrollments/{enrollmentId}/complete:
+    post:
+      tags: [Trainings]
+      summary: Mark enrollment complete (issue certificate)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: enrollmentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Completion + certificate info
+
+  /api/hub/trainings/{id}/certificates:
+    get:
+      tags: [Trainings]
+      summary: List certificates for training
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Certificate rows
+
+  /api/hub/trainings/{id}/stream-sessions:
+    post:
+      tags: [Trainings]
+      summary: Create stream session metadata
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StreamSessionRequest"
+      responses:
+        "201":
+          description: Stream session row
+
+  /api/hub/trainings/{id}/stream-sessions/{streamSessionId}:
+    patch:
+      tags: [Trainings]
+      summary: Update stream session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: streamSessionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchStreamSessionRequest"
+      responses:
+        "200":
+          description: Updated session
+
+  /api/hub/trainings/{id}/recordings:
+    get:
+      tags: [Trainings]
+      summary: List recordings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: library_only
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+            default: "true"
+          description: Admins may set false to include non-library items
+      responses:
+        "200":
+          description: Recording list
+    post:
+      tags: [Trainings]
+      summary: Add recording to library
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordingRequest"
+      responses:
+        "201":
+          description: Recording row

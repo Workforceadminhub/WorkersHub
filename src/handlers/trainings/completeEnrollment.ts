@@ -2,16 +2,16 @@ import { withAuth } from "../../middleware";
 import TrainingService from "../../services/training.server";
 import { response } from "../../utils";
 import { canManageTrainingOperations } from "../../utils/trainingPermissions";
-import { idempotencyKeyFromEvent } from "./_utils";
+import { idempotencyKeyFromEvent, pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   if (!canManageTrainingOperations(auth)) {
     return { statusCode: 403, body: JSON.stringify({ success: false, message: "Forbidden" }) };
   }
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    const enrollmentId = parseInt(event.pathParameters?.enrollmentId ?? "", 10);
-    if (!Number.isFinite(trainingId) || !Number.isFinite(enrollmentId)) {
+    const trainingId = pathParamId(event, "id");
+    const enrollmentId = pathParamId(event, "enrollmentId");
+    if (!trainingId || !enrollmentId) {
       return response(400, "Invalid ids");
     }
 

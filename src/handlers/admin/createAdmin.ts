@@ -8,7 +8,19 @@ export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, auth) => {
     const body = JSON.parse(req.body ?? "{}");
     const code = body.code;
     if (!code || typeof code !== "string" || !code.trim()) {
-      return response(400, "code is required (login code for the admin)");
+      return response(400, "code is required (unique identifier / display code for the admin)");
+    }
+
+    const isactive = body.isactive !== undefined ? body.isactive : true;
+    const emailStr = typeof body.email === "string" ? body.email.trim() : "";
+    const passwordStr = typeof body.password === "string" ? body.password : "";
+    if (isactive) {
+      if (!emailStr) {
+        return response(400, "email is required for active accounts");
+      }
+      if (passwordStr.length < 8) {
+        return response(400, "password is required for active accounts (min 8 characters)");
+      }
     }
 
     const permissionLevel = Array.isArray(body.permission_level)
@@ -17,7 +29,8 @@ export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, auth) => {
 
     const input: CreateAdminInput = {
       code: code.trim(),
-      email: body.email != null ? (typeof body.email === "string" ? body.email.trim() || null : null) : null,
+      email: emailStr || null,
+      initialPassword: passwordStr.length ? passwordStr : null,
       department: body.department ?? null,
       team: body.team ?? null,
       route: body.route ?? null,
@@ -26,7 +39,10 @@ export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, auth) => {
       role: body.role ?? null,
       permission_level: permissionLevel ?? null,
       userinfo: body.userinfo ?? null,
-      workerid: body.workerid != null ? Number(body.workerid) : null,
+      workerid:
+        body.workerid != null && String(body.workerid).trim() !== ""
+          ? String(body.workerid).trim()
+          : null,
     };
 
     const result = await createAdmin(input, auth.userId);

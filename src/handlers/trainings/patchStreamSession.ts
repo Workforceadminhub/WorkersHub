@@ -2,15 +2,16 @@ import { withAuth } from "../../middleware";
 import TrainingService from "../../services/training.server";
 import { response } from "../../utils";
 import { canManageTrainingOperations } from "../../utils/trainingPermissions";
+import { pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   if (!canManageTrainingOperations(auth)) {
     return { statusCode: 403, body: JSON.stringify({ success: false, message: "Forbidden" }) };
   }
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    const streamSessionId = parseInt(event.pathParameters?.streamSessionId ?? "", 10);
-    if (!Number.isFinite(trainingId) || !Number.isFinite(streamSessionId)) {
+    const trainingId = pathParamId(event, "id");
+    const streamSessionId = pathParamId(event, "streamSessionId");
+    if (!trainingId || !streamSessionId) {
       return response(400, "Invalid ids");
     }
 

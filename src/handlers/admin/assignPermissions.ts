@@ -9,8 +9,8 @@ export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, auth) => {
     if (!id) {
       return response(400, "Admin id is required");
     }
-    const adminId = parseInt(id, 10);
-    if (Number.isNaN(adminId)) {
+    const adminId = id.trim();
+    if (!adminId) {
       return response(400, "Invalid admin id");
     }
 

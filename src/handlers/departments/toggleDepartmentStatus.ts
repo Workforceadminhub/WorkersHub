@@ -12,8 +12,9 @@ export const handler = withRole(ROLES_ADMIN_AND_ABOVE, async (event, auth) => {
     const body = JSON.parse(event.body);
     const { id, isactive } = body;
 
-    if (!id || typeof id !== "number") {
-      return response(400, "Department id is required and must be a number");
+    const idStr = id == null ? "" : typeof id === "string" ? id.trim() : String(id).trim();
+    if (!idStr) {
+      return response(400, "Department id is required");
     }
 
     if (typeof isactive !== "boolean") {
@@ -21,7 +22,7 @@ export const handler = withRole(ROLES_ADMIN_AND_ABOVE, async (event, auth) => {
     }
 
     const service = DepartmentService();
-    const department = await service.toggleDepartmentStatus(id, isactive);
+    const department = await service.toggleDepartmentStatus(idStr, isactive);
 
     return {
       statusCode: 200,

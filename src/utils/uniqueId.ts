@@ -1,7 +1,9 @@
 import { monotonicFactory } from "ulid";
 
-const ulid = monotonicFactory()
+const ulid = monotonicFactory();
 
-export const getUniqueId = () => {
-  return ulid();
-}
+/** Server-generated monotonic ULID (26 chars). Use for all primary keys. */
+export const getUniqueId = () => ulid();
+
+/** Alias for `getUniqueId` — same monotonic ULID factory. */
+export const getUlid = getUniqueId;

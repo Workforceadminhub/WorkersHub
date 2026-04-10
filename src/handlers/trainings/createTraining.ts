@@ -11,7 +11,7 @@ export const handler = withAuth(async (event, auth) => {
   try {
     const body = JSON.parse(event.body || "{}");
     const adminId = adminUserIdFromAuth(auth.userId);
-    if (!Number.isFinite(adminId) || adminId < 1) {
+    if (!adminId) {
       return response(400, "Invalid admin user");
     }
     const svc = TrainingService();

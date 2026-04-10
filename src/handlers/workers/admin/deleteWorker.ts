@@ -11,7 +11,7 @@ export const handler = withRole(ROLES_ADMIN_AND_ABOVE, async (event, auth) => {
     }
 
     const service = WorkersService();
-    const data = await service.deleteWorker(parseInt(id));
+    const data = await service.deleteWorker(id.trim());
     if (!data) {
       return response(500, "Failed to delete worker.");
     }

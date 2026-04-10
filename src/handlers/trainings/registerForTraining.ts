@@ -3,24 +3,24 @@ import TrainingService, { resolveWorkerIdFromAdminUser } from "../../services/tr
 import { response } from "../../utils";
 import { ROLES } from "../../utils/enums";
 import { canNominateWorkers } from "../../utils/trainingPermissions";
-import { adminUserIdFromAuth, idempotencyKeyFromEvent } from "./_utils";
+import { adminUserIdFromAuth, coerceId, idempotencyKeyFromEvent, pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    if (!Number.isFinite(trainingId)) return response(400, "Invalid training id");
+    const trainingId = pathParamId(event, "id");
+    if (!trainingId) return response(400, "Invalid training id");
 
     const body = JSON.parse(event.body || "{}");
     const adminId = adminUserIdFromAuth(auth.userId);
-    let workerId: number | null = null;
+    let workerId: string | null = null;
 
     if (body.worker_id != null && canNominateWorkers(auth)) {
-      workerId = parseInt(String(body.worker_id), 10);
+      workerId = coerceId(body.worker_id) || null;
     } else {
       workerId = await resolveWorkerIdFromAdminUser(adminId);
     }
 
-    if (workerId == null || !Number.isFinite(workerId)) {
+    if (!workerId) {
       return response(403, "No worker profile linked to this account");
     }
 

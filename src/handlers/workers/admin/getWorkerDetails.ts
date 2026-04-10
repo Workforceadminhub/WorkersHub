@@ -11,7 +11,7 @@ export const handler = withRole(ROLES_ADMIN_AND_ABOVE, async (event, auth) => {
     }
 
     const service = WorkersService();
-    const data = await service.getWorker(parseInt(id));
+    const data = await service.getWorker(id.trim());
     if (!data) {
       return response(200, "Worker not found");
     }

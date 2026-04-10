@@ -14,7 +14,9 @@ export const handler = withRole(ROLES_WITH_USER_ACCESS, async (event, auth) => {
     console.log({ auth, workerId, deleteData });
 
     const service = WorkersService();
-    const data = await service.removeWorker(parseInt(workerId), {
+    const wid = String(workerId ?? "").trim();
+    if (!wid) return response(400, "workerid is required");
+    const data = await service.removeWorker(wid, {
       reasonfordelete,
       nameofrequester,
       roleofrequester,

@@ -4,7 +4,7 @@ import { sql } from "kysely";
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("activity_audit")
-    .addColumn("id", "serial", (col) => col.primaryKey())
+    .addColumn("id", "text", (col) => col.primaryKey())
     .addColumn("user_id", "integer")
     .addColumn("user_code", "varchar(255)")
     .addColumn("action", "varchar(255)", (col) => col.notNull())

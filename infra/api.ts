@@ -1,4 +1,4 @@
-import { DB_CLUSTERS_ARN, DB_NAME, DB_SECRET_ARN, JWT_SECRET } from "./secrets";
+import { BREVO_API_KEY, DB_CLUSTERS_ARN, DB_NAME, DB_SECRET_ARN, JWT_SECRET } from "./secrets";
 
 export const api = new sst.aws.ApiGatewayV2("HarvestersApi");
 
@@ -11,10 +11,139 @@ export const env = {
   REPORT_EMAILS: process.env.REPORT_EMAILS!,
 };
 
+/** Extra env for auth flows (links in email, optional bootstrap gate). */
+const authEnv = {
+  ...env,
+  APP_PUBLIC_URL: process.env.APP_PUBLIC_URL ?? "",
+  FRONTEND_URL: process.env.FRONTEND_URL ?? "",
+  AUTH_BOOTSTRAP_SECRET: process.env.AUTH_BOOTSTRAP_SECRET ?? "",
+  BREVO_SENDER_EMAIL: process.env.BREVO_SENDER_EMAIL ?? "",
+  BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME ?? "",
+};
+
 api.route("POST /api/hub/auth/signin", {
   handler: "src/handlers/auth/login.handler",
-  environment: { ...env },
+  environment: { ...authEnv },
   link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("POST /api/hub/auth/register", {
+  handler: "src/handlers/auth/register.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET, BREVO_API_KEY],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("POST /api/hub/auth/bootstrap-super-admin", {
+  handler: "src/handlers/auth/bootstrapSuperAdmin.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("POST /api/hub/auth/forgot-password", {
+  handler: "src/handlers/auth/forgotPassword.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET, BREVO_API_KEY],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("POST /api/hub/auth/reset-password", {
+  handler: "src/handlers/auth/resetPassword.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("GET /api/hub/auth/verify-email", {
+  handler: "src/handlers/auth/verifyEmail.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("POST /api/hub/auth/verify-email", {
+  handler: "src/handlers/auth/verifyEmail.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
+  timeout: "100 seconds",
+  permissions: [
+    {
+      actions: ["rds-data:*"],
+      resources: ["*"],
+    },
+    {
+      actions: ["secretsmanager:*"],
+      resources: ["*"],
+    },
+  ],
+});
+
+api.route("POST /api/hub/auth/resend-verification", {
+  handler: "src/handlers/auth/resendVerification.handler",
+  environment: { ...authEnv },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET, BREVO_API_KEY],
   timeout: "100 seconds",
   permissions: [
     {

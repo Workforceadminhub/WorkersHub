@@ -15,9 +15,9 @@ export const handler = withRole(ROLES_WITH_USER_ACCESS, async (event, auth) => {
       return response(400, "workerid is required");
     }
 
-    const workerid = typeof workeridRaw === "number" ? workeridRaw : parseInt(workeridRaw, 10);
-    if (Number.isNaN(workerid)) {
-      return response(400, "workerid must be a number");
+    const workerid = String(workeridRaw).trim();
+    if (!workerid) {
+      return response(400, "workerid is required");
     }
 
     const attendancedate =

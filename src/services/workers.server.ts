@@ -6,7 +6,6 @@ import { signAccessToken, signRefreshToken, verifyToken } from "../utils";
 import { addDays } from "date-fns";
 import { getNextSunday } from "../utils/getDate";
 import { routeObject } from "../utils/routeObjects";
-import { sql } from "kysely";
 import { sendEmailThroughBrevo, sendEmailThroughBrevoTemplate } from "../utils/brevo";
 
 type UserType = {
@@ -340,12 +339,7 @@ const WorkersService = () => {
         ? `${worker.lastname} ${worker.othername} ${worker.firstname}`
         : `${worker.lastname} ${worker.firstname}`;
 
-      const result =
-        await sql<number>`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM worker`.execute(db);
-      console.log("Next worker ID result:", result);
-      //@ts-ignore
-      const nextId = result.rows[0].next_id;
-      console.log("Next worker ID:", nextId);
+      const nextId = getUniqueId();
 
       const now = new Date();
       const [inserted] = await db
@@ -369,7 +363,7 @@ const WorkersService = () => {
     }
   };
 
-  const removeWorker = async (workerid: number, deleteData: any) => {
+  const removeWorker = async (workerid: string, deleteData: any) => {
     try {
       // fetch the worker to ensure they exist
       const worker = await db
@@ -502,11 +496,7 @@ const WorkersService = () => {
       ? `${input.lastname} ${input.othername} ${input.firstname}`
       : `${input.lastname} ${input.firstname}`;
 
-    const result =
-      await sql<number>`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM worker`.execute(db);
-    console.log("Next worker ID result:", result);
-    //@ts-ignore
-    const nextId = result.rows[0].next_id;
+    const nextId = getUniqueId();
     const now = new Date();
     const [worker] = await db
       .insertInto("worker")
@@ -526,7 +516,7 @@ const WorkersService = () => {
     return worker;
   };
 
-  const updateWorker = async (id: number, updates: Partial<WorkerInput>) => {
+  const updateWorker = async (id: string, updates: Partial<WorkerInput>) => {
     const worker = await db
       .selectFrom("worker")
       .select(["worker.id"])
@@ -548,7 +538,7 @@ const WorkersService = () => {
     return updatedWorker;
   };
 
-  const approveWorker = async (id: number) => {
+  const approveWorker = async (id: string) => {
     const worker = await db
       .selectFrom("worker")
       .select(["worker.id"])
@@ -572,7 +562,7 @@ const WorkersService = () => {
     return updatedWorker;
   };
 
-  const approveRemoveWorker = async (id: number) => {
+  const approveRemoveWorker = async (id: string) => {
     const worker = await db
       .selectFrom("worker")
       .select(["worker.id"])
@@ -594,7 +584,7 @@ const WorkersService = () => {
     return updatedWorker;
   };
 
-  const getWorker = async (id: number) => {
+  const getWorker = async (id: string) => {
     const worker = await db
       .selectFrom("worker")
       .selectAll()
@@ -608,7 +598,7 @@ const WorkersService = () => {
     return worker;
   };
 
-  const deleteWorker = async (id: number) => {
+  const deleteWorker = async (id: string) => {
     const worker = await db
       .selectFrom("worker")
       .selectAll()

@@ -2,14 +2,15 @@ import { withAuth } from "../../middleware";
 import TrainingService from "../../services/training.server";
 import { response } from "../../utils";
 import { canCreateTrainingAndCurriculum } from "../../utils/trainingPermissions";
+import { pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   if (!canCreateTrainingAndCurriculum(auth)) {
     return { statusCode: 403, body: JSON.stringify({ success: false, message: "Forbidden" }) };
   }
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    if (!Number.isFinite(trainingId)) return response(400, "Invalid training id");
+    const trainingId = pathParamId(event, "id");
+    if (!trainingId) return response(400, "Invalid training id");
     const body = JSON.parse(event.body || "{}");
     if (!body.title?.trim()) return response(400, "title required");
 

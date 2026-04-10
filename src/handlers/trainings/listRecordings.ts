@@ -3,12 +3,12 @@ import TrainingService, { resolveWorkerIdFromAdminUser } from "../../services/tr
 import { response } from "../../utils";
 import { ROLES } from "../../utils/enums";
 import { canViewTrainingDashboard } from "../../utils/trainingPermissions";
-import { adminUserIdFromAuth } from "./_utils";
+import { adminUserIdFromAuth, pathParamId } from "./_utils";
 
 export const handler = withAuth(async (event, auth) => {
   try {
-    const trainingId = parseInt(event.pathParameters?.id ?? "", 10);
-    if (!Number.isFinite(trainingId)) return response(400, "Invalid training id");
+    const trainingId = pathParamId(event, "id");
+    if (!trainingId) return response(400, "Invalid training id");
 
     const isWorker = auth.role === ROLES.USER || auth.role === ROLES.WORKER;
     if (isWorker) {

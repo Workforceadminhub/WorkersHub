@@ -9,7 +9,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema.dropTable("activity_audit").ifExists().execute();
   await db.schema
     .createTable("audit_log")
-    .addColumn("id", "serial", (col) => col.primaryKey())
+    .addColumn("id", "text", (col) => col.primaryKey())
     .addColumn("user_id", "integer")
     .addColumn("user_code", "varchar(255)")
     .addColumn("event", "varchar(255)", (col) => col.notNull())

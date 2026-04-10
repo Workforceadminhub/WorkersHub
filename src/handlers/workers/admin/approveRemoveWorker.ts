@@ -11,7 +11,7 @@ export const handler = withRole(ROLES_ADMIN_AND_ABOVE, async (event, auth) => {
     }
 
     const service = WorkersService();
-    const data = await service.approveRemoveWorker(parseInt(id));
+    const data = await service.approveRemoveWorker(id.trim());
 
     return {
       statusCode: 200,

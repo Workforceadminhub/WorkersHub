@@ -1,5 +1,6 @@
 import { db } from "../database/db.server";
 import { sql } from "kysely";
+import { getUniqueId } from "../utils";
 import type { AuthContext } from "../middleware/requireAuth";
 import { filterByPermissions } from "../utils/permissions";
 
@@ -12,7 +13,7 @@ interface DepartmentInput {
 }
 
 interface UpdateDepartmentInput {
-  id: number;
+  id: string;
   name?: string;
   team?: string | null;
   route?: string | null;
@@ -45,7 +46,7 @@ const DepartmentService = () => {
       console.log(`Found ${allWorkers.length} workers with departments`);
 
       // Combine and deduplicate - group by department name, get the team
-      const departmentMap = new Map<string, { id: number; team: string | null; route: string | null; isactive: boolean | null }>();
+      const departmentMap = new Map<string, { id: string; team: string | null; route: string | null; isactive: boolean | null }>();
 
       // Add departments from admin table
       adminDepartments.forEach((admin) => {
@@ -154,22 +155,9 @@ const DepartmentService = () => {
         throw new Error("Department already exists");
       }
 
-      // Get the actual last id from admin table (not sequence value)
-      const lastRecord = await db
-        .selectFrom("admin")
-        .select(["id"])
-        .orderBy("id", "desc")
-        .limit(1)
-        .executeTakeFirst();
+      const newId = getUniqueId();
 
-      const lastId = lastRecord?.id;
-      console.log("Last id in admin table:", lastId);
-      
-      // Calculate new id: lastId + 1, or 1 if no records exist
-      const newId = lastId ? lastId + 1 : 1;
-      console.log("New id to be inserted:", newId);
-
-      // Insert into admin table with manual id
+      // Insert into admin table with server-generated id
       const now = new Date();
       const newDepartment = await db
         .insertInto("admin")
@@ -202,7 +190,7 @@ const DepartmentService = () => {
   };
 
   // Enable or disable a department
-  const toggleDepartmentStatus = async (departmentId: number, isactive: boolean) => {
+  const toggleDepartmentStatus = async (departmentId: string, isactive: boolean) => {
     try {
       // Find the department by id
       const existing = await db
@@ -322,7 +310,7 @@ const DepartmentService = () => {
   };
 
   // Delete a department
-  const deleteDepartment = async (departmentId: number) => {
+  const deleteDepartment = async (departmentId: string) => {
     try {
       // Check if department exists
       const existing = await db
