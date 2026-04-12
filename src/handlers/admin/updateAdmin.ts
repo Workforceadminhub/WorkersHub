@@ -11,7 +11,7 @@ const ALLOWED_KEYS: (keyof UpdateAdminFields)[] = [
   "route",
   "isactive",
   "userinfo",
-  "workerid",
+  "linked_church_worker_id",
 ];
 
 export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, _auth) => {
@@ -28,13 +28,17 @@ export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, _auth) => {
     const body = JSON.parse(req.body ?? "{}") as Record<string, unknown>;
     const fields: UpdateAdminFields = {};
     for (const key of ALLOWED_KEYS) {
+      if (key === "linked_church_worker_id") {
+        if (!("linked_church_worker_id" in body) && !("workerid" in body)) continue;
+        const raw = body.workerid ?? body.linked_church_worker_id;
+        const s = raw == null ? "" : String(raw).trim();
+        fields.linked_church_worker_id = s ? s : null;
+        continue;
+      }
       if (key in body && body[key] !== undefined) {
         const v = body[key];
         if (key === "isactive") {
           fields[key] = v === true || v === false ? v : null;
-        } else if (key === "workerid") {
-          const s = v == null ? "" : String(v).trim();
-          fields[key] = s ? s : null;
         } else {
           fields[key] = typeof v === "string" ? v.trim() || null : v == null ? null : String(v);
         }

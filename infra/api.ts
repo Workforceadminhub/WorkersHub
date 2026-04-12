@@ -664,6 +664,17 @@ api.route("GET /api/hub/departments", {
   ],
 });
 
+api.route("GET /api/hub/roles", {
+  handler: "src/handlers/roles/listChurchRoles.handler",
+  environment: { ...env },
+  link: [DB_NAME, DB_CLUSTERS_ARN, DB_SECRET_ARN, JWT_SECRET],
+  timeout: "100 seconds",
+  permissions: [
+    { actions: ["rds-data:*"], resources: ["*"] },
+    { actions: ["secretsmanager:*"], resources: ["*"] },
+  ],
+});
+
 api.route("POST /api/hub/departments", {
   handler: "src/handlers/departments/addDepartment.handler",
   environment: { ...env },

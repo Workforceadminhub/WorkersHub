@@ -18,6 +18,7 @@ tags:
   - name: Super Admin
   - name: Attendance
   - name: Departments
+  - name: Roles
   - name: Trainings
   - name: Users
   - name: Reports
@@ -222,6 +223,173 @@ components:
         email:
           type: string
           format: email
+
+    WorkerCoreFields:
+      type: object
+      description: >
+        Worker profile fields. API accepts typical worker columns (firstname, lastname, etc.).
+      properties:
+        firstname: { type: string }
+        lastname: { type: string }
+        othername: { type: string }
+        email: { type: string, format: email }
+        phonenumber: { type: string }
+        maritalstatus: { type: string }
+        department: { type: string }
+        team: { type: string }
+        workerrole: { type: string }
+        birthdate: { type: string }
+        agerange: { type: string }
+        gender: { type: string }
+        address: { type: string }
+        occupation: { type: string }
+        employment: { type: string }
+        status: { type: string }
+        isactive: { type: boolean }
+
+    CreateWorkerRequest:
+      allOf:
+        - $ref: "#/components/schemas/WorkerCoreFields"
+        - type: object
+          required: [firstname, lastname]
+          description: Super-admin create worker; persisted with computed fullname / status PENDING_ADD unless overridden.
+
+    AddWorkerRequest:
+      allOf:
+        - $ref: "#/components/schemas/WorkerCoreFields"
+        - type: object
+          required: [firstname, lastname]
+          description: Public add-worker flow (POST /api/hub/workers/add).
+
+    UpdateWorkerRequest:
+      allOf:
+        - $ref: "#/components/schemas/WorkerCoreFields"
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+              description: Worker ULID
+
+    AttendanceRecordInput:
+      type: object
+      description: One row in attendance array (field names match API expectations).
+      properties:
+        name: { type: string }
+        workerid: { type: string, description: Worker id (ULID) }
+        department: { type: string }
+        team: { type: string }
+        attendancedate: { type: string, description: Date string for the meeting }
+        attendance: { type: string, description: Status; defaults to "Not recorded" if omitted }
+        church_meeting_id: { type: string, description: Optional link to church_meeting row }
+
+    AddAttendanceRequest:
+      type: object
+      required: [attendance]
+      properties:
+        attendance:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/AttendanceRecordInput"
+
+    ExportAttendanceRequest:
+      type: object
+      required: [attendancedate]
+      properties:
+        attendancedate:
+          type: string
+          description: Date string for the attendance snapshot to export
+
+    AddDepartmentRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        team: { type: string }
+        route: { type: string }
+        isactive: { type: boolean, default: true }
+        code: { type: string }
+
+    UpdateDepartmentRequest:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        team: { type: string }
+        route: { type: string }
+        isactive: { type: boolean }
+        code: { type: string }
+
+    ToggleDepartmentStatusRequest:
+      type: object
+      required: [id, isactive]
+      properties:
+        id: { type: string }
+        isactive: { type: boolean }
+
+    UpdateAdminRequest:
+      type: object
+      description: Partial update; only sent fields are applied.
+      properties:
+        email: { type: string, format: email }
+        code: { type: string }
+        department: { type: string }
+        team: { type: string }
+        route: { type: string }
+        isactive: { type: boolean }
+        userinfo: { type: string }
+        linked_church_worker_id: { type: string }
+        workerid: { type: string, description: Alias for linked_church_worker_id }
+
+    AssignRoleRequest:
+      type: object
+      description: Provide at least one of role or permission_level.
+      properties:
+        role: { type: string, description: Role code e.g. super-admin, worker }
+        permission_level:
+          type: array
+          items: { type: string }
+        permissionLevel:
+          type: array
+          items: { type: string }
+          description: CamelCase alias for permission_level
+
+    AssignPermissionsRequest:
+      type: object
+      required: [permissions]
+      properties:
+        permissions:
+          type: array
+          items: { type: string }
+          description: Department names the admin may access
+
+    RequestWorkerDeleteRequest:
+      type: object
+      required: [workerid]
+      properties:
+        workerid: { type: string }
+        deleteData:
+          type: object
+          properties:
+            reasonfordelete: { type: string }
+            nameofrequester: { type: string }
+            roleofrequester: { type: string }
+
+    DeleteAttendanceRecordRequest:
+      type: object
+      required: [workerid]
+      properties:
+        workerid: { type: string }
+        workerId: { type: string, description: Alias }
+        attendancedate: { type: string, description: Optional; defaults server-side if omitted }
+        attendanceDate: { type: string, description: Alias }
+
+    EmptyJsonBody:
+      type: object
+      description: No fields required. Send `{}` or omit body per client.
+      additionalProperties: true
 
 security:
   - bearerAuth: []
@@ -430,10 +598,11 @@ paths:
       tags: [Super Admin]
       summary: Create worker
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/CreateWorkerRequest"
       responses:
         "200":
           description: Created
@@ -441,10 +610,11 @@ paths:
       tags: [Super Admin]
       summary: Update worker
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/UpdateWorkerRequest"
       responses:
         "200":
           description: Updated
@@ -454,10 +624,11 @@ paths:
       tags: [Super Admin]
       summary: Export attendance
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/ExportAttendanceRequest"
       responses:
         "200":
           description: Export triggered or file info
@@ -471,11 +642,6 @@ paths:
           in: path
           required: true
           schema: { type: string }
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         "200":
           description: OK
@@ -517,6 +683,7 @@ paths:
       tags: [Super Admin]
       summary: Create admin
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -535,10 +702,11 @@ paths:
           required: true
           schema: { type: string }
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/UpdateAdminRequest"
       responses:
         "200":
           description: OK
@@ -564,10 +732,11 @@ paths:
           required: true
           schema: { type: string }
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/AssignRoleRequest"
       responses:
         "200":
           description: OK
@@ -582,10 +751,11 @@ paths:
           required: true
           schema: { type: string }
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/AssignPermissionsRequest"
       responses:
         "200":
           description: OK
@@ -616,10 +786,11 @@ paths:
       tags: [Workers]
       summary: Add workers
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/AddWorkerRequest"
       responses:
         "200":
           description: OK
@@ -629,10 +800,11 @@ paths:
       tags: [Workers]
       summary: Request worker delete
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/RequestWorkerDeleteRequest"
       responses:
         "200":
           description: OK
@@ -674,10 +846,11 @@ paths:
       tags: [Attendance]
       summary: Add attendance
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/AddAttendanceRequest"
       responses:
         "200":
           description: OK
@@ -694,11 +867,7 @@ paths:
     put:
       tags: [Attendance]
       summary: Close attendance
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
+      description: Handler does not read a JSON body.
       responses:
         "200":
           description: OK
@@ -707,11 +876,7 @@ paths:
     put:
       tags: [Attendance]
       summary: Enable attendance
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
+      description: Handler does not read a JSON body.
       responses:
         "200":
           description: OK
@@ -720,11 +885,7 @@ paths:
     put:
       tags: [Attendance]
       summary: Disable attendance
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
+      description: Handler does not read a JSON body.
       responses:
         "200":
           description: OK
@@ -733,11 +894,7 @@ paths:
     delete:
       tags: [Attendance]
       summary: Delete not-recorded attendance
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
+      description: Handler does not read a JSON body.
       responses:
         "200":
           description: OK
@@ -747,10 +904,11 @@ paths:
       tags: [Attendance]
       summary: Delete attendance record
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/DeleteAttendanceRecordRequest"
       responses:
         "200":
           description: OK
@@ -759,11 +917,13 @@ paths:
     post:
       tags: [Reports]
       summary: Generate workers report
+      description: Handler ignores body; optional empty JSON `{}` is fine.
       requestBody:
+        required: false
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/EmptyJsonBody"
       responses:
         "200":
           description: OK
@@ -779,21 +939,23 @@ paths:
       tags: [Departments]
       summary: Add department
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/AddDepartmentRequest"
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
     put:
       tags: [Departments]
       summary: Update department
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/UpdateDepartmentRequest"
       responses:
         "200":
           description: OK
@@ -803,10 +965,11 @@ paths:
       tags: [Departments]
       summary: Toggle department status
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: "#/components/schemas/ToggleDepartmentStatusRequest"
       responses:
         "200":
           description: OK
@@ -823,6 +986,14 @@ paths:
       responses:
         "200":
           description: OK
+
+  /api/hub/roles:
+    get:
+      tags: [Roles]
+      summary: List active church hub roles (reference data for UI)
+      responses:
+        "200":
+          description: Array of role rows (code, label, description, sort_order, is_active)
 
   /api/hub/trainings:
     get:
@@ -905,6 +1076,8 @@ paths:
           required: true
           schema: { type: string }
       requestBody:
+        required: false
+        description: Optional worker_id when an admin registers someone else; omit for self-registration.
         content:
           application/json:
             schema:
@@ -1084,6 +1257,7 @@ paths:
     post:
       tags: [Trainings]
       summary: Mark enrollment complete (issue certificate)
+      description: Identifiers are in the path only; body is not read by the handler.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - name: id
@@ -1094,6 +1268,12 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmptyJsonBody"
       responses:
         "200":
           description: Completion + certificate info

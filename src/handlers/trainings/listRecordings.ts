@@ -1,5 +1,5 @@
 import { withAuth } from "../../middleware";
-import TrainingService, { resolveWorkerIdFromAdminUser } from "../../services/training.server";
+import TrainingService, { resolveWorkerIdFromChurchAdminUser } from "../../services/training.server";
 import { response } from "../../utils";
 import { ROLES } from "../../utils/enums";
 import { canViewTrainingDashboard } from "../../utils/trainingPermissions";
@@ -13,7 +13,7 @@ export const handler = withAuth(async (event, auth) => {
     const isWorker = auth.role === ROLES.USER || auth.role === ROLES.WORKER;
     if (isWorker) {
       const adminId = adminUserIdFromAuth(auth.userId);
-      const wid = await resolveWorkerIdFromAdminUser(adminId);
+      const wid = await resolveWorkerIdFromChurchAdminUser(adminId);
       if (wid == null) return response(403, "No worker profile linked");
       const svc = TrainingService();
       const enrolled = await svc.isEnrolled(trainingId, wid);

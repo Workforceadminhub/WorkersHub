@@ -1,5 +1,5 @@
 import { withAuth } from "../../middleware";
-import TrainingService, { resolveWorkerIdFromAdminUser } from "../../services/training.server";
+import TrainingService, { resolveWorkerIdFromChurchAdminUser } from "../../services/training.server";
 import { response } from "../../utils";
 import { ROLES } from "../../utils/enums";
 import { canNominateWorkers } from "../../utils/trainingPermissions";
@@ -17,7 +17,7 @@ export const handler = withAuth(async (event, auth) => {
     if (body.worker_id != null && canNominateWorkers(auth)) {
       workerId = coerceId(body.worker_id) || null;
     } else {
-      workerId = await resolveWorkerIdFromAdminUser(adminId);
+      workerId = await resolveWorkerIdFromChurchAdminUser(adminId);
     }
 
     if (!workerId) {
@@ -33,13 +33,13 @@ export const handler = withAuth(async (event, auth) => {
       return response(403, "Cannot register another worker with this account");
     }
 
-    const nominationSource: "self" | "admin" | "leader" = isSelf
+    const nominationSource: "self" | "staff" | "leader" = isSelf
       ? "self"
       : auth.role === ROLES.SUPER_ADMIN ||
           auth.role === ROLES.ADMIN ||
           auth.role === ROLES.CHURCH_ADMIN ||
           auth.role === ROLES.WF_ADMIN
-        ? "admin"
+        ? "staff"
         : "leader";
 
     const svc = TrainingService();

@@ -7,7 +7,7 @@ const getRole = (user: {
   id: string;
   code: string | null;
   userinfo: string | null;
-  workerid: string | null;
+  linked_church_worker_id: string | null;
   createdat: Date | null;
   updatedat: Date | null;
   route: string | null;
@@ -37,7 +37,7 @@ function getPermissions(user: { permissions?: unknown; department?: string | nul
 
 const AuthService = () => {
   /**
-   * Email + password sign-in. Email is stored normalized (lowercase) on `admin.email`.
+   * Email + password sign-in. Email is stored normalized (lowercase) on `church_admin_workers.email`.
    * Inactive accounts (e.g. pending self-registration) receive a clear error.
    */
   const login = async ({ email, password }: { email: string; password: string }) => {
@@ -47,7 +47,7 @@ const AuthService = () => {
     }
 
     const user = await db
-      .selectFrom("admin as users")
+      .selectFrom("church_admin_workers as users")
       .selectAll()
       .where("users.email", "=", emailNorm)
       .executeTakeFirst();

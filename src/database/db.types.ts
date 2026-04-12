@@ -1,5 +1,6 @@
 /**
- * Kysely types for Harvesters Hub. Primary keys are varchar(26) ULIDs (server: getUlid / getUniqueId).
+ * Kysely types for Harvesters Hub (church operations).
+ * Primary keys are varchar(26) ULIDs unless noted (server: getUlid / getUniqueId).
  */
 
 import type { ColumnType } from "kysely";
@@ -21,6 +22,31 @@ export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+/* ---------------------------------- ROLES ----------------------------------- */
+
+/** Reference roles for church hub (codes match church_admin_workers.role / JWT). */
+export interface ChurchRole {
+  code: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  createdat: Generated<Timestamp>;
+}
+
+/* -------------------------------- ORGANIZATION ------------------------------- */
+
+export interface Department {
+  id: string;
+  name: string;
+  team: string | null;
+  route: string | null;
+  code: string | null;
+  isactive: boolean;
+  createdat: Generated<Timestamp>;
+  updatedat: Timestamp;
+}
 
 /* ---------------------------------- WORKER ---------------------------------- */
 
@@ -55,13 +81,11 @@ export interface Worker {
   roleofrequester: string | null;
 }
 
-/* ----------------------------------- ADMIN ---------------------------------- */
-
-export interface Admin {
+/** Staff / leaders who authenticate to the hub (Super Admin … Cell Leader). */
+export interface ChurchAdminWorkers {
   id: string;
   code: string | null;
   email: string | null;
-  /** bcrypt hash; null until password is set (legacy or invite-only rows). */
   password_hash: string | null;
   reset_password_token: string | null;
   reset_password_expires: Timestamp | null;
@@ -69,7 +93,7 @@ export interface Admin {
   email_verification_token: string | null;
   email_verification_expires: Timestamp | null;
   userinfo: string | null;
-  workerid: string | null;
+  linked_church_worker_id: string | null;
   createdat: Generated<Timestamp | null>;
   updatedat: Timestamp | null;
   route: string | null;
@@ -83,6 +107,18 @@ export interface Admin {
   permission_level: JsonArray | null;
 }
 
+/* -------------------------------- MEETINGS --------------------------------- */
+
+export interface ChurchMeeting {
+  id: string;
+  meeting_type: string;
+  title: string | null;
+  scheduled_date: Timestamp;
+  department_id: string | null;
+  metadata: JsonObject | null;
+  createdat: Generated<Timestamp>;
+}
+
 /* ----------------------------------- Attendance ---------------------------------- */
 
 export interface Attendance {
@@ -93,6 +129,7 @@ export interface Attendance {
   attendancedate: string;
   department: string | null;
   team: string | null;
+  church_meeting_id: string | null;
 }
 
 export interface UniqueDate {
@@ -101,7 +138,7 @@ export interface UniqueDate {
 }
 
 export interface ExpiryTable {
-  id: string;
+  id: number;
   isClosed: boolean | null;
 }
 
@@ -132,7 +169,7 @@ export interface Training {
   capacity: number | null;
   registration_deadline: Timestamp | null;
   template_slug: string;
-  created_by_admin_id: string | null;
+  created_by_church_admin_worker_id: string | null;
   createdat: Generated<Timestamp>;
   updatedat: Timestamp;
 }
@@ -228,11 +265,156 @@ export interface ApiIdempotency {
   createdat: Generated<Timestamp>;
 }
 
+/* --------------------------------- Courses ---------------------------------- */
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  level: string;
+  language_code: string;
+  image_url: string | null;
+  status: string;
+  instructor_church_admin_worker_id: string | null;
+  published_at: Timestamp | null;
+  createdat: Generated<Timestamp>;
+  updatedat: Timestamp;
+}
+
+export interface CourseSection {
+  id: string;
+  course_id: string;
+  title: string;
+  sort_order: number;
+  createdat: Generated<Timestamp>;
+}
+
+export interface CourseLecture {
+  id: string;
+  section_id: string;
+  title: string;
+  lecture_type: string;
+  content_url: string | null;
+  duration_seconds: number | null;
+  assessment: JsonObject | null;
+  sort_order: number;
+  createdat: Generated<Timestamp>;
+}
+
+export interface CourseEnrollment {
+  id: string;
+  course_id: string;
+  worker_id: string;
+  enrolled_at: Generated<Timestamp>;
+  completed_at: Timestamp | null;
+  progress: JsonObject | null;
+}
+
+/* ----------------------------- Community & operations ------------------------ */
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  author_church_admin_worker_id: string | null;
+  visibility_department_id: string | null;
+  is_published: boolean;
+  published_at: Timestamp | null;
+  createdat: Generated<Timestamp>;
+  updatedat: Timestamp;
+}
+
+export interface WelfareRequest {
+  id: string;
+  worker_id: string;
+  subject: string;
+  body: string | null;
+  status: string;
+  createdat: Generated<Timestamp>;
+  updatedat: Timestamp;
+}
+
+export interface FeedbackEntry {
+  id: string;
+  worker_id: string;
+  category: string | null;
+  body: JsonObject;
+  createdat: Generated<Timestamp>;
+}
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  description: string | null;
+  storage_url: string;
+  mime_type: string | null;
+  department_scope: string | null;
+  uploaded_by_church_admin_worker_id: string | null;
+  createdat: Generated<Timestamp>;
+}
+
+export interface RecognitionEntry {
+  id: string;
+  worker_id: string;
+  headline: string;
+  body: string | null;
+  awarded_by_church_admin_worker_id: string | null;
+  createdat: Generated<Timestamp>;
+}
+
+export interface TeamHealthReport {
+  id: string;
+  department_id: string;
+  period_start: Timestamp;
+  period_end: Timestamp;
+  summary: JsonObject | null;
+  status: string;
+  author_church_admin_worker_id: string | null;
+  createdat: Generated<Timestamp>;
+  updatedat: Timestamp;
+}
+
+export interface TeamHealthGoal {
+  id: string;
+  report_id: string | null;
+  department_id: string;
+  title: string;
+  details: string | null;
+  target_date: Timestamp | null;
+  goal_status: string;
+  createdat: Generated<Timestamp>;
+}
+
+export interface GrowthTrackUpload {
+  id: string;
+  department_id: string;
+  upload_label: string;
+  file_url: string;
+  uploaded_by_church_admin_worker_id: string | null;
+  createdat: Generated<Timestamp>;
+}
+
+export interface ExportJob {
+  id: string;
+  job_kind: string;
+  status: string;
+  output_url: string | null;
+  error_message: string | null;
+  payload: JsonObject | null;
+  requested_by_church_admin_worker_id: string | null;
+  createdat: Generated<Timestamp>;
+  completed_at: Timestamp | null;
+}
+
 /* ------------------------------------ DB ------------------------------------ */
 
 export interface DB {
+  church_role: ChurchRole;
+  department: Department;
   worker: Worker;
-  admin: Admin;
+  church_admin_workers: ChurchAdminWorkers;
+  church_meeting: ChurchMeeting;
   attendance: Attendance;
   unique_dates: UniqueDate;
   expirytable: ExpiryTable;
@@ -247,4 +429,17 @@ export interface DB {
   training_stream_session: TrainingStreamSession;
   training_recording: TrainingRecording;
   api_idempotency: ApiIdempotency;
+  course: Course;
+  course_section: CourseSection;
+  course_lecture: CourseLecture;
+  course_enrollment: CourseEnrollment;
+  announcement: Announcement;
+  welfare_request: WelfareRequest;
+  feedback_entry: FeedbackEntry;
+  resource_item: ResourceItem;
+  recognition_entry: RecognitionEntry;
+  team_health_report: TeamHealthReport;
+  team_health_goal: TeamHealthGoal;
+  growth_track_upload: GrowthTrackUpload;
+  export_job: ExportJob;
 }

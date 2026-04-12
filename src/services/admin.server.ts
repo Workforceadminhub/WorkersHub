@@ -19,7 +19,7 @@ export type CreateAdminInput = {
   role?: string | null;
   permission_level?: string[] | null;
   userinfo?: string | null;
-  workerid?: string | null;
+  linked_church_worker_id?: string | null;
 };
 
 export type RegisterPublicUserInput = {
@@ -59,7 +59,7 @@ export async function registerPublicUser(
   if (!email) throw new Error("A valid email is required");
   assertPasswordPolicy(input.password);
 
-  const dup = await db.selectFrom("admin").select("id").where("email", "=", email).executeTakeFirst();
+  const dup = await db.selectFrom("church_admin_workers").select("id").where("email", "=", email).executeTakeFirst();
   if (dup) throw new Error("An account with this email already exists");
 
   const newId = getUniqueId();
@@ -76,14 +76,14 @@ export async function registerPublicUser(
       : null;
 
   await db
-    .insertInto("admin")
+    .insertInto("church_admin_workers")
     .values({
       id: newId,
       code,
       email,
       password_hash: hashPassword(input.password),
       userinfo,
-      workerid: null,
+      linked_church_worker_id: null,
       createdat: now,
       updatedat: now,
       route: null,
@@ -121,12 +121,12 @@ export async function createAdmin(
   input: CreateAdminInput,
   assignedByUserId?: string | null
 ): Promise<{ id: string; code: string; permissions: string[]; role: string | null; permission_level: string[] }> {
-  const existing = await db.selectFrom("admin").select(["id"]).where("code", "=", input.code).executeTakeFirst();
+  const existing = await db.selectFrom("church_admin_workers").select(["id"]).where("code", "=", input.code).executeTakeFirst();
   if (existing) throw new Error("An admin with this code already exists");
 
   const emailNorm = normalizeEmail(input.email ?? null);
   if (emailNorm) {
-    const dupEmail = await db.selectFrom("admin").select("id").where("email", "=", emailNorm).executeTakeFirst();
+    const dupEmail = await db.selectFrom("church_admin_workers").select("id").where("email", "=", emailNorm).executeTakeFirst();
     if (dupEmail) throw new Error("An admin with this email already exists");
   }
 
@@ -150,14 +150,16 @@ export async function createAdmin(
   const emailVerifiedAt = isactive ? now : null;
 
   await db
-    .insertInto("admin")
+    .insertInto("church_admin_workers")
     .values({
       id: newId,
       code: input.code,
       email: emailNorm,
       password_hash,
       userinfo: input.userinfo ?? null,
-      workerid: input.workerid?.trim() ? input.workerid.trim() : null,
+      linked_church_worker_id: input.linked_church_worker_id?.trim()
+        ? input.linked_church_worker_id.trim()
+        : null,
       createdat: now,
       updatedat: now,
       route: input.route ?? null,
@@ -200,14 +202,14 @@ export async function assignRole(
     set.permission_level = sql`CAST(${JSON.stringify(permissionLevel ?? [])} AS JSONB)`;
   }
   if (Object.keys(set).length === 0) {
-    const existing = await db.selectFrom("admin").select(["id", "role", "permission_level"]).where("id", "=", adminId).executeTakeFirst();
+    const existing = await db.selectFrom("church_admin_workers").select(["id", "role", "permission_level"]).where("id", "=", adminId).executeTakeFirst();
     if (!existing) return null;
     const levels = Array.isArray(existing.permission_level) ? (existing.permission_level as string[]) : [];
     return { id: existing.id, role: existing.role, permission_level: levels };
   }
 
   const updated = await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set(set as any)
     .where("id", "=", adminId)
     .returning(["id", "role", "permission_level"])
@@ -236,7 +238,7 @@ export async function assignPermissions(
   const now = new Date();
 
   const updated = await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set({
       permissions: sql`CAST(${permissionsJson} AS JSONB)`,
       assigned_by: assignedBy,
@@ -270,7 +272,7 @@ export type UpdateAdminFields = {
   route?: string | null;
   isactive?: boolean | null;
   userinfo?: string | null;
-  workerid?: string | null;
+  linked_church_worker_id?: string | null;
 };
 
 /**
@@ -289,7 +291,7 @@ export async function updateAdmin(
   route: string | null;
   isactive: boolean | null;
   userinfo: string | null;
-  workerid: string | null;
+  linked_church_worker_id: string | null;
 } | null> {
   const allowedKeys: (keyof UpdateAdminFields)[] = [
     "email",
@@ -299,7 +301,7 @@ export async function updateAdmin(
     "route",
     "isactive",
     "userinfo",
-    "workerid",
+    "linked_church_worker_id",
   ];
   const set: Record<string, unknown> = { updatedat: new Date() };
   for (const key of allowedKeys) {
@@ -313,18 +315,38 @@ export async function updateAdmin(
   }
   if (Object.keys(set).length <= 1) {
     const existing = await db
-      .selectFrom("admin")
-      .select(["id", "code", "email", "department", "team", "route", "isactive", "userinfo", "workerid"])
+      .selectFrom("church_admin_workers")
+      .select([
+        "id",
+        "code",
+        "email",
+        "department",
+        "team",
+        "route",
+        "isactive",
+        "userinfo",
+        "linked_church_worker_id",
+      ])
       .where("id", "=", adminId)
       .executeTakeFirst();
     return existing ?? null;
   }
 
   const updated = await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set(set as any)
     .where("id", "=", adminId)
-    .returning(["id", "code", "email", "department", "team", "route", "isactive", "userinfo", "workerid"])
+    .returning([
+      "id",
+      "code",
+      "email",
+      "department",
+      "team",
+      "route",
+      "isactive",
+      "userinfo",
+      "linked_church_worker_id",
+    ])
     .executeTakeFirst();
 
   return updated ?? null;
@@ -346,7 +368,7 @@ export async function bootstrapSuperAdmin(input: {
   }
 
   const countRow = await db
-    .selectFrom("admin")
+    .selectFrom("church_admin_workers")
     .select((eb) => eb.fn.count("id").as("c"))
     .where("role", "=", ROLES.SUPER_ADMIN)
     .executeTakeFirst();
@@ -359,25 +381,25 @@ export async function bootstrapSuperAdmin(input: {
   if (!emailNorm) throw new Error("A valid email is required");
   assertPasswordPolicy(input.password);
 
-  const dup = await db.selectFrom("admin").select("id").where("email", "=", emailNorm).executeTakeFirst();
+  const dup = await db.selectFrom("church_admin_workers").select("id").where("email", "=", emailNorm).executeTakeFirst();
   if (dup) throw new Error("An account with this email already exists");
 
   const code = input.code?.trim() || getUniqueId();
-  const dupCode = await db.selectFrom("admin").select("id").where("code", "=", code).executeTakeFirst();
+  const dupCode = await db.selectFrom("church_admin_workers").select("id").where("code", "=", code).executeTakeFirst();
   if (dupCode) throw new Error("This code is already in use");
 
   const now = new Date();
   const newId = getUniqueId();
 
   await db
-    .insertInto("admin")
+    .insertInto("church_admin_workers")
     .values({
       id: newId,
       code,
       email: emailNorm,
       password_hash: hashPassword(input.password),
       userinfo: null,
-      workerid: null,
+      linked_church_worker_id: null,
       createdat: now,
       updatedat: now,
       route: "/super-admin",
@@ -405,13 +427,13 @@ export async function requestPasswordReset(emailRaw: string): Promise<void> {
   const email = normalizeEmail(emailRaw);
   if (!email) return;
 
-  const user = await db.selectFrom("admin").select(["id", "email"]).where("email", "=", email).executeTakeFirst();
+  const user = await db.selectFrom("church_admin_workers").select(["id", "email"]).where("email", "=", email).executeTakeFirst();
   if (!user?.email) return;
 
   const token = randomOpaqueToken();
   const expires = hoursFromNow(1);
   await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set({
       reset_password_token: token,
       reset_password_expires: expires,
@@ -434,7 +456,7 @@ export async function resetPasswordWithToken(tokenRaw: string, newPassword: stri
 
   const now = new Date();
   const user = await db
-    .selectFrom("admin")
+    .selectFrom("church_admin_workers")
     .select(["id"])
     .where("reset_password_token", "=", token)
     .where("reset_password_expires", ">", now)
@@ -443,7 +465,7 @@ export async function resetPasswordWithToken(tokenRaw: string, newPassword: stri
   if (!user) throw new Error("Invalid or expired reset token");
 
   await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set({
       password_hash: hashPassword(newPassword),
       reset_password_token: null,
@@ -460,7 +482,7 @@ export async function verifyEmailWithToken(tokenRaw: string): Promise<void> {
 
   const now = new Date();
   const user = await db
-    .selectFrom("admin")
+    .selectFrom("church_admin_workers")
     .select(["id"])
     .where("email_verification_token", "=", token)
     .where("email_verification_expires", ">", now)
@@ -469,7 +491,7 @@ export async function verifyEmailWithToken(tokenRaw: string): Promise<void> {
   if (!user) throw new Error("Invalid or expired verification token");
 
   await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set({
       email_verified_at: now,
       email_verification_token: null,
@@ -486,7 +508,7 @@ export async function resendEmailVerification(emailRaw: string): Promise<void> {
   if (!email) return;
 
   const user = await db
-    .selectFrom("admin")
+    .selectFrom("church_admin_workers")
     .select(["id", "email", "email_verified_at"])
     .where("email", "=", email)
     .executeTakeFirst();
@@ -495,7 +517,7 @@ export async function resendEmailVerification(emailRaw: string): Promise<void> {
   const token = randomOpaqueToken();
   const expires = hoursFromNow(48);
   await db
-    .updateTable("admin")
+    .updateTable("church_admin_workers")
     .set({
       email_verification_token: token,
       email_verification_expires: expires,
@@ -516,7 +538,7 @@ export async function resendEmailVerification(emailRaw: string): Promise<void> {
  */
 export async function deleteAdmin(adminId: string): Promise<{ id: string } | null> {
   const deleted = await db
-    .deleteFrom("admin")
+    .deleteFrom("church_admin_workers")
     .where("id", "=", adminId)
     .returning(["id"])
     .executeTakeFirst();
@@ -526,7 +548,7 @@ export async function deleteAdmin(adminId: string): Promise<{ id: string } | nul
 /** List all admin users for permission/role management. */
 export async function listAdmins() {
   return db
-    .selectFrom("admin")
+    .selectFrom("church_admin_workers")
     .select([
       "id",
       "code",

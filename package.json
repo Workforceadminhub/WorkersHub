@@ -10,7 +10,7 @@
     "deploy:harvesters": "npx sst deploy --stage harvesters",
     "db:generate:types": "npx kysely-codegen --out-file ./src/database/db.types.ts --dialect postgres --env-file ./.env && sed =i '' 's/DB/Database/g' ./src/database/db.types.ts",
     "db:migrate:make": "sst shell kysely migrate:make",
-    "db:migrate:latest": "sst shell kysely migrate:latest --stage chidibede && npm run db:generate:types",
+    "db:migrate:latest": "sst shell kysely migrate:latest --stage production && npm run db:generate:types",
     "db:migrate:rollback": "sst shell -- kysely migrate:rollback --all && npm run db:generate:types",
     "db:migrate:latest:production": "sst shell --stage production kysely migrate:latest && npm run db:generate:types",
     "db:migrate:rollback:production": "sst shell --stage production -- kysely migrate:rollback --all && npm run db:generate:types",
@@ -18,7 +18,8 @@
     "db:migrate:up": "sst shell kysely migrate:up && npm run db:generate:types",
     "db:migrate:down": "sst shell kysely migrate:down && npm run db:generate:types",
     "set:secrets": "sst shell --stage production -- ts-node scripts/set-secrets.ts",
-    "populate:admin-permissions": "sst shell -- ts-node scripts/populate-admin-permissions.ts"
+    "populate:church-admin-permissions": "sst shell --stage production -- ts-node scripts/populate-church-admin-permissions.ts",
+    "populate:church-roles": "sst shell --stage production -- ts-node scripts/populate-church-roles.ts"
   },
   "keywords": [],
   "author": "",

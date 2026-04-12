@@ -39,10 +39,13 @@ export const handler = withRole(ROLES_SUPER_ADMIN_ONLY, async (req, auth) => {
       role: body.role ?? null,
       permission_level: permissionLevel ?? null,
       userinfo: body.userinfo ?? null,
-      workerid:
-        body.workerid != null && String(body.workerid).trim() !== ""
+      linked_church_worker_id:
+        (body.linked_church_worker_id != null && String(body.linked_church_worker_id).trim() !== ""
+          ? String(body.linked_church_worker_id).trim()
+          : null) ??
+        (body.workerid != null && String(body.workerid).trim() !== ""
           ? String(body.workerid).trim()
-          : null,
+          : null),
     };
 
     const result = await createAdmin(input, auth.userId);

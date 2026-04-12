@@ -134,7 +134,7 @@ const AttendanceService = () => {
         )
         .execute();
 
-      const routes = await db.selectFrom("admin").selectAll().execute();
+      const routes = await db.selectFrom("church_admin_workers").selectAll().execute();
 
       // Filter routes based on group
       let uniqueRoutes;
@@ -230,7 +230,7 @@ const AttendanceService = () => {
 
       const workers = await workersQuery.execute();
 
-      const routes = await db.selectFrom("admin").selectAll().execute();
+      const routes = await db.selectFrom("church_admin_workers").selectAll().execute();
 
       let uniqueRoutes = routes
         .filter(
@@ -489,17 +489,11 @@ const AttendanceService = () => {
       const data = await query.execute();
 
       // Aggregate counts per worker per department (sum up all Present records, all Absent records)
-      const workerCounts: Record<
-        string,
-        Record<
-          number,
-          { name: string; present: number; absent: number }
-        >
-      > = {};
+      const workerCounts: Record<string, Record<string, { name: string; present: number; absent: number }>> = {};
 
       data.forEach((record) => {
         const dept = normalizeDepartmentName(record.department) || "Unknown";
-        const workerId = record.workerid || 0;
+        const workerId = record.workerid?.trim() || "unknown";
         const name = record.name || "";
         const count = Number(record.count) || 0;
 
@@ -520,26 +514,26 @@ const AttendanceService = () => {
       const result: Record<
         string,
         {
-          topPresent: Array<{ workerid: number; name: string; count: number }>;
-          topAbsent: Array<{ workerid: number; name: string; count: number }>;
+          topPresent: Array<{ workerid: string; name: string; count: number }>;
+          topAbsent: Array<{ workerid: string; name: string; count: number }>;
         }
       > = {};
 
       Object.keys(workerCounts).forEach((dept) => {
-        const present: Array<{ workerid: number; name: string; count: number }> = [];
-        const absent: Array<{ workerid: number; name: string; count: number }> = [];
+        const present: Array<{ workerid: string; name: string; count: number }> = [];
+        const absent: Array<{ workerid: string; name: string; count: number }> = [];
 
         Object.entries(workerCounts[dept]).forEach(([workerId, data]) => {
           if (data.present > 0) {
             present.push({
-              workerid: Number(workerId),
+              workerid: workerId,
               name: data.name,
               count: data.present,
             });
           }
           if (data.absent > 0) {
             absent.push({
-              workerid: Number(workerId),
+              workerid: workerId,
               name: data.name,
               count: data.absent,
             });

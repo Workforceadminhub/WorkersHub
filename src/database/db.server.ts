@@ -6,6 +6,7 @@ import { DataApiDialect } from "kysely-data-api";
 import { RDSData } from "@aws-sdk/client-rds-data";
 
 const getDialect = () => {
+  console.log({ database: Resource.DB_CLUSTERS_ARN.value})
   return new DataApiDialect({
     mode: "postgres",
     driver: {

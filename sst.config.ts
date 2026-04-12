@@ -4,13 +4,13 @@ export default $config({
   app(input) {
     return {
       name: "harvestershub",
-      removal: input?.stage === "production" || input?.stage === "harvesters" ? "retain" : "remove",
-      protect: ["production", "harvesters"].includes(input?.stage),
+      removal: input?.stage === "production" ? "retain" : "remove",
+      protect: ["production"].includes(input?.stage),
       home: "aws",
       providers: {
         aws: {
           region: "eu-west-1",
-          profile: input?.stage === "harvesters" ? "harvesters" : "default",
+          profile: "harvesters",
           defaultTags: {
             tags: {
               project: "harvestershub",

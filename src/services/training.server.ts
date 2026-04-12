@@ -21,22 +21,27 @@ function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toYmd(v: string | Date): string {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return typeof v === "string" ? v.slice(0, 10) : "";
+}
+
 function trainingLifecycle(start: string | Date, end: string | Date): "upcoming" | "ongoing" | "completed" {
   const t = todayDateString();
-  const s = typeof start === "string" ? start.slice(0, 10) : start.toISOString().slice(0, 10);
-  const e = typeof end === "string" ? end.slice(0, 10) : end.toISOString().slice(0, 10);
+  const s = toYmd(start);
+  const e = toYmd(end);
   if (t < s) return "upcoming";
   if (t > e) return "completed";
   return "ongoing";
 }
 
-export async function resolveWorkerIdFromAdminUser(adminUserId: string): Promise<string | null> {
+export async function resolveWorkerIdFromChurchAdminUser(churchAdminWorkerId: string): Promise<string | null> {
   const row = await db
-    .selectFrom("admin")
-    .select("workerid")
-    .where("id", "=", adminUserId)
+    .selectFrom("church_admin_workers")
+    .select("linked_church_worker_id")
+    .where("id", "=", churchAdminWorkerId)
     .executeTakeFirst();
-  return row?.workerid ?? null;
+  return row?.linked_church_worker_id ?? null;
 }
 
 async function workerCompletedTemplateBefore(
@@ -70,7 +75,7 @@ export type CreateTrainingInput = {
 };
 
 const TrainingService = () => {
-  const createTraining = async (input: CreateTrainingInput, createdByAdminId: string) => {
+  const createTraining = async (input: CreateTrainingInput, createdByChurchAdminWorkerId: string) => {
     if (!CATEGORIES.includes(input.category)) {
       throw new Error(`Invalid category; expected one of: ${CATEGORIES.join(", ")}`);
     }
@@ -97,7 +102,7 @@ const TrainingService = () => {
         capacity: input.capacity ?? null,
         registration_deadline: input.registration_deadline ? new Date(input.registration_deadline) : null,
         template_slug: templateSlug,
-        created_by_admin_id: createdByAdminId,
+        created_by_church_admin_worker_id: createdByChurchAdminWorkerId,
         createdat: now,
         updatedat: now,
       })
@@ -124,7 +129,7 @@ const TrainingService = () => {
     let upcoming = 0;
     let completed = 0;
     for (const tr of all) {
-      const life = trainingLifecycle(tr.start_date as string, tr.end_date as string);
+      const life = trainingLifecycle(tr.start_date, tr.end_date);
       if (life === "ongoing") ongoing++;
       else if (life === "upcoming") upcoming++;
       else completed++;
@@ -183,7 +188,7 @@ const TrainingService = () => {
 
     const rows = await q.orderBy("start_date", "desc").execute();
     const filtered = rows.filter((tr) => {
-      const life = trainingLifecycle(tr.start_date as string, tr.end_date as string);
+      const life = trainingLifecycle(tr.start_date, tr.end_date);
       if (params.status && life !== params.status) return false;
       return true;
     });
@@ -213,7 +218,7 @@ const TrainingService = () => {
       category: tr.category,
       mode: tr.mode,
       cohort: tr.cohort,
-      status: trainingLifecycle(tr.start_date as string, tr.end_date as string),
+      status: trainingLifecycle(tr.start_date, tr.end_date),
       number_of_enrollees: countMap.get(tr.id) ?? 0,
       number_of_primary_enrollees: undefined as number | undefined,
     }));
@@ -334,7 +339,7 @@ const TrainingService = () => {
   const enrollWorker = async (opts: {
     trainingId: string;
     workerId: string;
-    nominationSource: "self" | "admin" | "leader";
+    nominationSource: "self" | "staff" | "leader";
     idempotencyKey?: string | null;
   }) => {
     const tr = await getTrainingById(opts.trainingId);
@@ -411,7 +416,7 @@ const TrainingService = () => {
   const nominateWorkers = async (opts: {
     trainingId: string;
     workerIds: string[];
-    nominationSource: "admin" | "leader";
+    nominationSource: "staff" | "leader";
     idempotencyKey?: string | null;
   }) => {
     const scope = `trainings:${opts.trainingId}:nominate`;
@@ -423,7 +428,7 @@ const TrainingService = () => {
         .where("route_scope", "=", scope)
         .executeTakeFirst();
       if (cached) {
-        return { results: cached.response_body as unknown[], replayed: true as const };
+        return { results: (cached.response_body as unknown) as unknown[], replayed: true as const };
       }
     }
 
@@ -562,12 +567,13 @@ const TrainingService = () => {
     session_date: string;
     status: "present" | "absent";
   }) => {
+    const sessionDate = new Date(opts.session_date);
     const existing = await db
       .selectFrom("training_participation")
       .select("id")
       .where("training_id", "=", opts.trainingId)
       .where("worker_id", "=", opts.workerId)
-      .where("session_date", "=", opts.session_date)
+      .where("session_date", "=", sessionDate)
       .executeTakeFirst();
 
     if (existing) {
@@ -585,7 +591,7 @@ const TrainingService = () => {
         id: getUniqueId(),
         training_id: opts.trainingId,
         worker_id: opts.workerId,
-        session_date: opts.session_date,
+        session_date: sessionDate,
         status: opts.status,
       })
       .returning("id")
@@ -601,7 +607,7 @@ const TrainingService = () => {
     required_duration_days: number;
   }) => {
     const dept = await db
-      .selectFrom("admin")
+      .selectFrom("department")
       .select("id")
       .where("id", "=", input.department_id)
       .executeTakeFirst();
@@ -625,7 +631,7 @@ const TrainingService = () => {
     const rows = await db
       .selectFrom("training_department_assignment as a")
       .innerJoin("worker as w", "w.id", "a.worker_id")
-      .leftJoin("admin as d", "d.id", "a.department_id")
+      .leftJoin("department as d", "d.id", "a.department_id")
       .select([
         "a.id",
         "a.worker_id",
@@ -636,7 +642,7 @@ const TrainingService = () => {
         "w.fullname",
         "w.firstname",
         "w.lastname",
-        "d.department as department_name",
+        "d.name as department_name",
       ])
       .where("a.training_id", "=", trainingId)
       .orderBy("a.createdat", "desc")
@@ -644,7 +650,7 @@ const TrainingService = () => {
 
     const today = new Date();
     return rows.map((r) => {
-      const start = new Date(r.start_date as string);
+      const start = r.start_date instanceof Date ? r.start_date : new Date(String(r.start_date));
       const daysElapsed = Math.max(
         0,
         Math.floor((today.getTime() - start.getTime()) / (86400 * 1000)),
@@ -699,7 +705,7 @@ const TrainingService = () => {
       category: r.category,
       mode: r.mode,
       enrollment_type: r.enrollment_type,
-      status: trainingLifecycle(r.start_date as string, r.end_date as string),
+      status: trainingLifecycle(r.start_date, r.end_date),
       completed_at: r.completed_at,
       enrolled_at: r.enrolled_at,
     }));
@@ -912,7 +918,7 @@ const TrainingService = () => {
       .selectFrom("training_enrollment")
       .selectAll()
       .where("training_id", "=", trainingId)
-      .where("nomination_source", "in", ["admin", "leader"])
+      .where("nomination_source", "in", ["staff", "leader"])
       .execute();
     const assignments = await listDepartmentAssignments(trainingId);
     const stream_sessions = await db

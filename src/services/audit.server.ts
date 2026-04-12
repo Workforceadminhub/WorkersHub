@@ -38,6 +38,17 @@ export type AuditPagination = {
   limit?: number;
 };
 
+function parseBoundaryDate(raw: string | null | undefined, endOfDay: boolean): Date | null {
+  const s = raw?.trim();
+  if (!s) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  if (endOfDay) {
+    d.setHours(23, 59, 59, 999);
+  }
+  return d;
+}
+
 export type ListAuditResult = {
   data: Array<{
     id: string;
@@ -177,11 +188,19 @@ export async function listAuditLogs(
         ? [filters.department.trim()]
         : [];
   if (deptList.length > 0) {
+    // jsonb_array_elements_text() errors if the value is not a JSON array (null, string, object).
+    // Only expand when jsonb_typeof is 'array'; otherwise rely on metadata->>'department' only.
     baseQuery = baseQuery.where(
       sql<boolean>`(${sql.join(
         deptList.map(
           (dept) =>
-            sql`(EXISTS (SELECT 1 FROM jsonb_array_elements_text(metadata->'departments') AS e WHERE LOWER(e) = LOWER(${dept})) OR LOWER(metadata->>'department') = LOWER(${dept}))`,
+            sql`(
+              (metadata IS NOT NULL AND jsonb_typeof(metadata->'departments') = 'array' AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements_text(metadata->'departments') AS e
+                WHERE LOWER(e) = LOWER(${dept})
+              ))
+              OR (metadata IS NOT NULL AND LOWER(metadata->>'department') = LOWER(${dept}))
+            )`,
         ),
         sql` OR `,
       )})`,
@@ -195,13 +214,13 @@ export async function listAuditLogs(
     const ad = filters.attendancedate.trim();
     baseQuery = baseQuery.where(sql<boolean>`LOWER(metadata->>'attendancedate') = LOWER(${ad})`);
   }
-  if (filters.fromDate) {
-    baseQuery = baseQuery.where("createdat", ">=", new Date(filters.fromDate));
+  const fromD = parseBoundaryDate(filters.fromDate ?? null, false);
+  if (fromD) {
+    baseQuery = baseQuery.where("createdat", ">=", fromD);
   }
-  if (filters.toDate) {
-    const to = new Date(filters.toDate);
-    to.setHours(23, 59, 59, 999);
-    baseQuery = baseQuery.where("createdat", "<=", to);
+  const toD = parseBoundaryDate(filters.toDate ?? null, true);
+  if (toD) {
+    baseQuery = baseQuery.where("createdat", "<=", toD);
   }
   if (filters.event?.trim()) {
     const events = filters.event

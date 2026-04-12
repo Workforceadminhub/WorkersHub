@@ -1,7 +1,7 @@
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 
-/** All training PKs/FKs use varchar(26) ULIDs (server-generated via getUlid / getUniqueId). */
+/** Trainings, curriculum, enrollments, streaming, certificates, and POST idempotency store. */
 
 export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
@@ -19,7 +19,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addColumn("capacity", "integer")
     .addColumn("registration_deadline", "timestamptz")
     .addColumn("template_slug", "varchar(255)", (col) => col.notNull())
-    .addColumn("created_by_admin_id", "varchar(26)")
+    .addColumn("created_by_church_admin_worker_id", "varchar(26)", (col) =>
+      col.references("church_admin_workers.id").onDelete("set null"),
+    )
     .addColumn("createdat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
     .addColumn("updatedat", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
     .execute();
@@ -33,11 +35,6 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     ALTER TABLE training
     ADD CONSTRAINT training_mode_check
     CHECK (mode IN ('physical', 'virtual'))
-  `.execute(db);
-  await sql`
-    ALTER TABLE training
-    ADD CONSTRAINT training_fk_admin
-    FOREIGN KEY (created_by_admin_id) REFERENCES admin(id)
   `.execute(db);
 
   await db.schema
@@ -65,7 +62,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addColumn("training_id", "varchar(26)", (col) => col.notNull().references("training.id").onDelete("cascade"))
     .addColumn("worker_id", "varchar(26)", (col) => col.notNull().references("worker.id").onDelete("cascade"))
     .addColumn("enrollment_type", "varchar(20)", (col) => col.notNull())
-    .addColumn("nomination_source", "varchar(20)", (col) => col.notNull())
+    .addColumn("nomination_source", "varchar(32)", (col) => col.notNull())
     .addColumn("enrolled_at", "timestamptz", (col) => col.defaultTo(sql`now()`).notNull())
     .addColumn("completed_at", "timestamptz")
     .addColumn("idempotency_key", "varchar(255)")
@@ -79,7 +76,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await sql`
     ALTER TABLE training_enrollment
     ADD CONSTRAINT training_enrollment_nomination_check
-    CHECK (nomination_source IN ('self', 'admin', 'leader'))
+    CHECK (nomination_source IN ('self', 'staff', 'leader'))
   `.execute(db);
   await sql`CREATE UNIQUE INDEX training_enrollment_training_worker ON training_enrollment(training_id, worker_id)`.execute(
     db,
@@ -112,7 +109,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .createTable("training_department_assignment")
     .addColumn("id", "varchar(26)", (col) => col.primaryKey())
     .addColumn("worker_id", "varchar(26)", (col) => col.notNull().references("worker.id").onDelete("cascade"))
-    .addColumn("department_id", "varchar(26)", (col) => col.notNull().references("admin.id").onDelete("restrict"))
+    .addColumn("department_id", "varchar(26)", (col) => col.notNull().references("department.id").onDelete("restrict"))
     .addColumn("training_id", "varchar(26)", (col) => col.references("training.id").onDelete("set null"))
     .addColumn("start_date", "date", (col) => col.notNull())
     .addColumn("required_duration_days", "integer", (col) => col.notNull())
@@ -176,9 +173,13 @@ export async function down(db: Kysely<unknown>): Promise<void> {
   await db.schema.dropTable("api_idempotency").execute();
   await db.schema.dropTable("training_recording").execute();
   await db.schema.dropTable("training_stream_session").execute();
+  await sql`DROP INDEX IF EXISTS training_certificate_training_worker`.execute(db);
   await db.schema.dropTable("training_certificate").execute();
   await db.schema.dropTable("training_department_assignment").execute();
+  await sql`DROP INDEX IF EXISTS training_participation_unique`.execute(db);
   await db.schema.dropTable("training_participation").execute();
+  await sql`DROP INDEX IF EXISTS training_enrollment_idempotency`.execute(db);
+  await sql`DROP INDEX IF EXISTS training_enrollment_training_worker`.execute(db);
   await db.schema.dropTable("training_enrollment").execute();
   await db.schema.dropTable("training_lesson").execute();
   await db.schema.dropTable("training_module").execute();

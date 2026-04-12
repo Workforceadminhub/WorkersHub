@@ -1,5 +1,5 @@
 import { withAuth } from "../../middleware";
-import TrainingService, { resolveWorkerIdFromAdminUser } from "../../services/training.server";
+import TrainingService, { resolveWorkerIdFromChurchAdminUser } from "../../services/training.server";
 import { response } from "../../utils";
 import { ROLES } from "../../utils/enums";
 import { canViewTrainingDashboard } from "../../utils/trainingPermissions";
@@ -11,7 +11,7 @@ export const handler = withAuth(async (event, auth) => {
     if (!pathId) return response(400, "Invalid user id");
 
     const adminId = adminUserIdFromAuth(auth.userId);
-    const linked = await resolveWorkerIdFromAdminUser(adminId);
+    const linked = await resolveWorkerIdFromChurchAdminUser(adminId);
 
     const isWorkerOnly = auth.role === ROLES.USER || auth.role === ROLES.WORKER;
     if (isWorkerOnly) {

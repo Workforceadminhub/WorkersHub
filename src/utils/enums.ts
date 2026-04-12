@@ -22,7 +22,7 @@ export function normalizeDepartmentName(name: string | null | undefined): string
   return trimmed;
 }
 
-/** Role values stored in admin.role and used in JWT/auth. */
+/** Role values stored in church_admin_workers.role and used in JWT/auth. */
 export const ROLES = {
   HOD: "HOD",
   SUB_TEAM_ADMIN: "sub-team-admin",

@@ -26,7 +26,7 @@ export const handler = withAuth(async (event, auth) => {
       auth.role === ROLES.ADMIN ||
       auth.role === ROLES.CHURCH_ADMIN ||
       auth.role === ROLES.WF_ADMIN
-        ? ("admin" as const)
+        ? ("staff" as const)
         : ("leader" as const);
 
     const svc = TrainingService();
