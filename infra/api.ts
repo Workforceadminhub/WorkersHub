@@ -16,6 +16,8 @@ const authEnv = {
   ...env,
   APP_PUBLIC_URL: process.env.APP_PUBLIC_URL ?? "",
   FRONTEND_URL: process.env.FRONTEND_URL ?? "",
+  /** Comma-separated origins allowed when clients send `frontend_url` on register/resend (e.g. https://app.com,https://staging.app.com). */
+  ALLOWED_REGISTRATION_ORIGINS: process.env.ALLOWED_REGISTRATION_ORIGINS ?? "",
   AUTH_BOOTSTRAP_SECRET: process.env.AUTH_BOOTSTRAP_SECRET ?? "",
   BREVO_SENDER_EMAIL: process.env.BREVO_SENDER_EMAIL ?? "",
   BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME ?? "",

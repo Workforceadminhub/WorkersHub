@@ -213,9 +213,15 @@ components:
           minLength: 8
     VerifyEmailBody:
       type: object
-      required: [token]
+      required: [email, otp]
       properties:
-        token: { type: string }
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+          pattern: "^[0-9]{6}$"
+          description: 6-digit code from the verification email (expires in 15 minutes)
     ResendVerificationRequest:
       type: object
       required: [email]
@@ -499,21 +505,16 @@ paths:
   /api/hub/auth/verify-email:
     get:
       tags: [Auth]
-      summary: Verify email (link from registration email)
+      summary: Verify email (not used — use POST)
+      description: Returns 400; verification is by 6-digit OTP via POST.
       security: []
-      parameters:
-        - name: token
-          in: query
-          required: true
-          schema: { type: string }
       responses:
-        "200":
-          description: Email verified
         "400":
-          description: Invalid or expired token
+          description: Use POST with email and otp
     post:
       tags: [Auth]
-      summary: Verify email (JSON body)
+      summary: Verify email with 6-digit OTP
+      description: After register, user enters the code from email on your OTP screen; frontend calls this with the same email and otp.
       security: []
       requestBody:
         required: true
@@ -525,7 +526,7 @@ paths:
         "200":
           description: Email verified
         "400":
-          description: Invalid or expired token
+          description: Invalid or expired code, or validation error
 
   /api/hub/auth/resend-verification:
     post:

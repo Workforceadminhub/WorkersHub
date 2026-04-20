@@ -26,6 +26,17 @@ function toYmd(v: string | Date): string {
   return typeof v === "string" ? v.slice(0, 10) : "";
 }
 
+/**
+ * RDS Data API + Kysely send string params as text; Postgres `date` columns need an explicit cast.
+ */
+function sqlDateColumn(ymd: string) {
+  const s = (ymd ?? "").trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    throw new Error(`Invalid date; use YYYY-MM-DD (got: ${ymd})`);
+  }
+  return sql`CAST(${s} AS DATE)`;
+}
+
 function trainingLifecycle(start: string | Date, end: string | Date): "upcoming" | "ongoing" | "completed" {
   const t = todayDateString();
   const s = toYmd(start);
@@ -35,13 +46,27 @@ function trainingLifecycle(start: string | Date, end: string | Date): "upcoming"
   return "ongoing";
 }
 
+/**
+ * Worker id for self-service training flows. Only returns an id that still exists on `worker`
+ * (avoids FK errors when linked_church_worker_id is stale or the worker row was removed).
+ */
 export async function resolveWorkerIdFromChurchAdminUser(churchAdminWorkerId: string): Promise<string | null> {
   const row = await db
-    .selectFrom("church_admin_workers")
-    .select("linked_church_worker_id")
-    .where("id", "=", churchAdminWorkerId)
+    .selectFrom("church_admin_workers as c")
+    .innerJoin("worker as w", "w.id", "c.linked_church_worker_id")
+    .select("w.id")
+    .where("c.id", "=", churchAdminWorkerId)
     .executeTakeFirst();
-  return row?.linked_church_worker_id ?? null;
+  return row?.id ?? null;
+}
+
+async function assertWorkerExists(workerId: string): Promise<void> {
+  const row = await db.selectFrom("worker").select("id").where("id", "=", workerId).executeTakeFirst();
+  if (!row) {
+    throw new Error(
+      `Worker not found for id "${workerId}". Use a congregation worker id from the directory (not a church admin user id).`,
+    );
+  }
 }
 
 async function workerCompletedTemplateBefore(
@@ -93,8 +118,9 @@ const TrainingService = () => {
         name: input.name.slice(0, 500),
         description: desc,
         cohort: input.cohort?.slice(0, 255) ?? null,
-        start_date: input.start_date,
-        end_date: input.end_date,
+        // Raw CAST for Postgres `date` (RDS Data API); Kysely DB typings use Timestamp.
+        start_date: sqlDateColumn(input.start_date) as unknown as Date,
+        end_date: sqlDateColumn(input.end_date) as unknown as Date,
         category: input.category,
         facilitator: input.facilitator?.slice(0, 500) ?? null,
         mode: input.mode,
@@ -345,6 +371,8 @@ const TrainingService = () => {
     const tr = await getTrainingById(opts.trainingId);
     if (!tr) throw new Error("Training not found");
 
+    await assertWorkerExists(opts.workerId);
+
     if (opts.idempotencyKey?.trim()) {
       const existing = await db
         .selectFrom("training_enrollment")
@@ -567,13 +595,15 @@ const TrainingService = () => {
     session_date: string;
     status: "present" | "absent";
   }) => {
-    const sessionDate = new Date(opts.session_date);
+    await assertWorkerExists(opts.workerId);
+    const sessionYmd = toYmd(opts.session_date);
+    if (!sessionYmd) throw new Error("session_date is required");
     const existing = await db
       .selectFrom("training_participation")
       .select("id")
       .where("training_id", "=", opts.trainingId)
       .where("worker_id", "=", opts.workerId)
-      .where("session_date", "=", sessionDate)
+      .where(sql<boolean>`session_date = CAST(${sessionYmd} AS DATE)`)
       .executeTakeFirst();
 
     if (existing) {
@@ -591,7 +621,7 @@ const TrainingService = () => {
         id: getUniqueId(),
         training_id: opts.trainingId,
         worker_id: opts.workerId,
-        session_date: sessionDate,
+        session_date: sqlDateColumn(sessionYmd) as unknown as Date,
         status: opts.status,
       })
       .returning("id")
@@ -613,6 +643,8 @@ const TrainingService = () => {
       .executeTakeFirst();
     if (!dept) throw new Error("Department not found");
 
+    await assertWorkerExists(input.worker_id);
+
     return db
       .insertInto("training_department_assignment")
       .values({
@@ -620,7 +652,7 @@ const TrainingService = () => {
         worker_id: input.worker_id,
         department_id: input.department_id,
         training_id: input.training_id,
-        start_date: input.start_date,
+        start_date: sqlDateColumn(input.start_date) as unknown as Date,
         required_duration_days: input.required_duration_days,
       })
       .returningAll()

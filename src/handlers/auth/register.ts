@@ -39,7 +39,7 @@ export const handler = async (event: APIGatewayProxyEventV2) => {
       body: JSON.stringify({
         success: true,
         message:
-          "Check your email to verify your address. Your account is pending approval by an administrator before you can sign in.",
+          "We sent a 6-digit code to your email. Enter it on the verification screen to confirm your address. Your account stays pending administrator approval until then.",
         data: { id: created.id, email: created.email },
       }),
     };

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { sql } from "kysely";
 import { db } from "../database/db.server";
 import { getUniqueId } from "../utils";
@@ -45,8 +45,27 @@ function randomOpaqueToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+/** 6-digit numeric code for email verification (stored in email_verification_token). */
+function generateEmailVerificationOtp(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
 function hoursFromNow(hours: number): Date {
   return new Date(Date.now() + hours * 3600 * 1000);
+}
+
+function minutesFromNow(minutes: number): Date {
+  return new Date(Date.now() + minutes * 60 * 1000);
+}
+
+const EMAIL_VERIFICATION_OTP_TTL_MINUTES = 15;
+
+export function normalizeVerificationOtpInput(otpRaw: string): string {
+  const digits = otpRaw.replace(/\s/g, "").replace(/\D/g, "");
+  if (!/^\d{6}$/.test(digits)) {
+    throw new Error("Enter the 6-digit code from your email.");
+  }
+  return digits;
 }
 
 /**
@@ -65,8 +84,8 @@ export async function registerPublicUser(
   const newId = getUniqueId();
   const code = getUniqueId();
   const now = new Date();
-  const verifyToken = randomOpaqueToken();
-  const verifyExpires = hoursFromNow(48);
+  const verifyOtp = generateEmailVerificationOtp();
+  const verifyExpires = minutesFromNow(EMAIL_VERIFICATION_OTP_TTL_MINUTES);
   const userinfo =
     input.firstname?.trim() || input.lastname?.trim()
       ? JSON.stringify({
@@ -96,7 +115,7 @@ export async function registerPublicUser(
       role: ROLES.WORKER,
       permission_level: sql`CAST('[]' AS JSONB)`,
       email_verified_at: null,
-      email_verification_token: verifyToken,
+      email_verification_token: verifyOtp,
       email_verification_expires: verifyExpires,
       reset_password_token: null,
       reset_password_expires: null,
@@ -104,10 +123,13 @@ export async function registerPublicUser(
     .execute();
 
   try {
-    await sendVerificationEmail(email, verifyToken);
+    await sendVerificationEmail(email, verifyOtp);
   } catch (e) {
-    console.error("[auth] Failed to send verification email:", e);
-    throw new Error("Account created but verification email could not be sent. Contact support.");
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("[auth] Failed to send verification email:", detail, e);
+    throw new Error(
+      `Account created but verification email could not be sent. ${detail}`,
+    );
   }
 
   return { id: newId, email };
@@ -476,19 +498,25 @@ export async function resetPasswordWithToken(tokenRaw: string, newPassword: stri
     .execute();
 }
 
-export async function verifyEmailWithToken(tokenRaw: string): Promise<void> {
-  const token = tokenRaw?.trim();
-  if (!token) throw new Error("Token is required");
+/**
+ * Marks email verified when the 6-digit OTP matches the pending code for that address.
+ */
+export async function verifyEmailWithOtp(emailRaw: string, otpRaw: string): Promise<void> {
+  const email = normalizeEmail(emailRaw);
+  if (!email) throw new Error("A valid email is required");
+  const otp = normalizeVerificationOtpInput(otpRaw);
 
   const now = new Date();
   const user = await db
     .selectFrom("church_admin_workers")
     .select(["id"])
-    .where("email_verification_token", "=", token)
+    .where("email", "=", email)
+    .where("email_verified_at", "is", null)
+    .where("email_verification_token", "=", otp)
     .where("email_verification_expires", ">", now)
     .executeTakeFirst();
 
-  if (!user) throw new Error("Invalid or expired verification token");
+  if (!user) throw new Error("Invalid or expired verification code");
 
   await db
     .updateTable("church_admin_workers")
@@ -514,12 +542,12 @@ export async function resendEmailVerification(emailRaw: string): Promise<void> {
     .executeTakeFirst();
   if (!user?.email || user.email_verified_at != null) return;
 
-  const token = randomOpaqueToken();
-  const expires = hoursFromNow(48);
+  const otp = generateEmailVerificationOtp();
+  const expires = minutesFromNow(EMAIL_VERIFICATION_OTP_TTL_MINUTES);
   await db
     .updateTable("church_admin_workers")
     .set({
-      email_verification_token: token,
+      email_verification_token: otp,
       email_verification_expires: expires,
       updatedat: new Date(),
     })
@@ -527,7 +555,7 @@ export async function resendEmailVerification(emailRaw: string): Promise<void> {
     .execute();
 
   try {
-    await sendVerificationEmail(user.email, token);
+    await sendVerificationEmail(user.email, otp);
   } catch (e) {
     console.error("[auth] Resend verification email failed:", e);
   }
